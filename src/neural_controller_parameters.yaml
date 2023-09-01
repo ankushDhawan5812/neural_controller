@@ -13,7 +13,7 @@ neural_controller:
 
   model_path: {
     type: string,
-    default_value: 'model.json',
+    default_value: '/home/pi/model_weights.json',
     description: 'Path to the model weights'
   }
 
@@ -27,6 +27,18 @@ neural_controller:
     type: double_array,
     default_value: [],
     description: 'Default joint positions to use when the controller is reset'
+  }
+
+  kps: {
+    type: double_array,
+    default_value: [],
+    description: 'Position gains for the joints'
+  }
+
+  kds: {
+    type: double_array,
+    default_value: [],
+    description: 'Velocity gains for the joints'
   }
 
   cmd_ang_vel_scale: {

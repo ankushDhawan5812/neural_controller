@@ -69,25 +69,25 @@ namespace neural_controller
     /* ----------------------------------------------- */
 
     /* ----------------- Model definition ----------------- */
-    RTNeural::ModelT<double, OBSERVATION_SIZE, ACTION_SIZE,
-      RTNeural::LSTMLayerT<double, OBSERVATION_SIZE, LSTM_SIZE>,
-      RTNeural::DenseT<double, LSTM_SIZE, DENSE_0_SIZE>,
-      RTNeural::ELuActivationT<double, DENSE_0_SIZE>,
-      RTNeural::DenseT<double, DENSE_0_SIZE, DENSE_1_SIZE>,
-      RTNeural::ELuActivationT<double, DENSE_1_SIZE>,
-      RTNeural::DenseT<double, DENSE_1_SIZE, DENSE_2_SIZE>,
-      RTNeural::ELuActivationT<double, DENSE_2_SIZE>,
-      RTNeural::DenseT<double, DENSE_2_SIZE, ACTION_SIZE>
+    RTNeural::ModelT<float, OBSERVATION_SIZE, ACTION_SIZE,
+      RTNeural::LSTMLayerT<float, OBSERVATION_SIZE, LSTM_SIZE>,
+      RTNeural::DenseT<float, LSTM_SIZE, DENSE_0_SIZE>,
+      RTNeural::ELuActivationT<float, DENSE_0_SIZE>,
+      RTNeural::DenseT<float, DENSE_0_SIZE, DENSE_1_SIZE>,
+      RTNeural::ELuActivationT<float, DENSE_1_SIZE>,
+      RTNeural::DenseT<float, DENSE_1_SIZE, DENSE_2_SIZE>,
+      RTNeural::ELuActivationT<float, DENSE_2_SIZE>,
+      RTNeural::DenseT<float, DENSE_2_SIZE, ACTION_SIZE>
     > model_;
     /* ----------------------------------------------------- */
 
     std::shared_ptr<ParamListener> param_listener_;
     Params params_;
 
-    double observation_[OBSERVATION_SIZE];
-    double action_[ACTION_SIZE];
+    float observation_[OBSERVATION_SIZE];
+    float action_[ACTION_SIZE];
 
-    double cmd_x_vel_, cmd_y_vel_, cmd_yaw_vel_;
+    float cmd_x_vel_, cmd_y_vel_, cmd_yaw_vel_;
 
     // Map from joint names to command types to command interfaces
     std::map<std::string, std::map<std::string, std::reference_wrapper<hardware_interface::LoanedCommandInterface>>>
@@ -100,7 +100,7 @@ namespace neural_controller
     realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>> rt_command_ptr_;
     rclcpp::Subscription<CmdType>::SharedPtr cmd_subscriber_;
 
-    double wrap_angle(double angle, double angle_min, double angle_max);
+    float wrap_angle(float angle, float angle_min, float angle_max);
 
   };
 
