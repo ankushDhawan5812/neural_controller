@@ -1,0 +1,15 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 50  # Hz
+
+    neural_controller:
+      type: neural_controller/NeuralController
+
+neural_controller:
+  ros__parameters:
+    joint_names: ["left_hip", "left_knee", "left_wheel", "right_hip", "right_knee", "right_wheel"]
+    default_joint_pos: [0.75, -1.5, 0.0, -0.75, 1.5, 0.0]
+    kps: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    # kds: [10.0, 10.0, 0.5, 10.0, 10.0, 0.5]
+    kds: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    action_type: "velocity"

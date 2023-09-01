@@ -41,40 +41,34 @@ neural_controller:
     description: 'Velocity gains for the joints'
   }
 
-  cmd_ang_vel_scale: {
+  lin_vel_scale: {
     type: double,
-    default_value: 1.0,
-    description: 'Scaling factor for the angular velocity command'
+    default_value: 2.0,
+    description: 'Scaling factor for the linear velocity commands'
   }
 
-  cmd_lin_vel_scale: {
+  ang_vel_scale: {
     type: double,
-    default_value: 1.0,
-    description: 'Scaling factor for the linear velocity command'
+    default_value: 0.25,
+    description: 'Scaling factor for the angular velocity observations/commands'
   }
 
-  obs_ang_vel_scale: {
+  joint_pos_scale: {
     type: double,
     default_value: 1.0,
-    description: 'Scaling factor for the angular velocity observation'
+    description: 'Scaling factor for the joint position observations'
   }
 
-  obs_joint_pos_scale: {
+  joint_vel_scale: {
     type: double,
-    default_value: 1.0,
-    description: 'Scaling factor for the joint position observation'
-  }
-
-  obs_joint_vel_scale: {
-    type: double,
-    default_value: 1.0,
-    description: 'Scaling factor for the joint velocity observation'
+    default_value: 0.05,
+    description: 'Scaling factor for the joint velocity observations'
   }
 
   action_scale: {
     type: double,
     default_value: 1.0,
-    description: 'Scaling factor for the action'
+    description: 'Scaling factor for the actions'
   }
 
   action_type: {

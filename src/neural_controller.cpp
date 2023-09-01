@@ -159,26 +159,26 @@ namespace neural_controller
       observation_[1] = 0.0;
       observation_[2] = 0.0;
       // Angular velocity
-      observation_[3] = (float) pitch_vel * params_.obs_ang_vel_scale;
-      observation_[4] = (float) roll_vel * params_.obs_ang_vel_scale;
-      observation_[5] = (float) yaw_vel * params_.obs_ang_vel_scale;
+      observation_[3] = (float) pitch_vel * params_.ang_vel_scale;
+      observation_[4] = (float) roll_vel * params_.ang_vel_scale;
+      observation_[5] = (float) yaw_vel * params_.ang_vel_scale;
       // Projected gravity vector
       observation_[6] = (float) projected_gravity_vector[0];
       observation_[7] = (float) projected_gravity_vector[1];
       observation_[8] = (float) projected_gravity_vector[2];
       // Commands
-      observation_[9] = (float) cmd_x_vel_ * params_.cmd_lin_vel_scale;
-      observation_[10] = (float) cmd_y_vel_ * params_.cmd_lin_vel_scale;
-      observation_[11] = (float) cmd_yaw_vel_ * params_.cmd_ang_vel_scale;
+      observation_[9] = (float) cmd_x_vel_ * params_.lin_vel_scale;
+      observation_[10] = (float) cmd_y_vel_ * params_.lin_vel_scale;
+      observation_[11] = (float) cmd_yaw_vel_ * params_.ang_vel_scale;
       // Joint positions
       for (int i = 0; i < ACTION_SIZE; i++)
       {
-        observation_[12 + i] = (float) wrap_angle((state_interfaces_map_.at(params_.joint_names[i]).at("position").get().get_value() - params_.default_joint_pos[i]) * params_.obs_joint_pos_scale, -2 * M_PI, 2 * M_PI);
+        observation_[12 + i] = (float) wrap_angle((state_interfaces_map_.at(params_.joint_names[i]).at("position").get().get_value() - params_.default_joint_pos[i]) * params_.joint_pos_scale, -2 * M_PI, 2 * M_PI);
       }
       // Joint velocities
       for (int i = 0; i < ACTION_SIZE; i++)
       {
-        observation_[12 + ACTION_SIZE + i] = (float) state_interfaces_map_.at(params_.joint_names[i]).at("velocity").get().get_value() * params_.obs_joint_vel_scale;
+        observation_[12 + ACTION_SIZE + i] = (float) state_interfaces_map_.at(params_.joint_names[i]).at("velocity").get().get_value() * params_.joint_vel_scale;
       }
     }
     catch (const std::out_of_range &e)
