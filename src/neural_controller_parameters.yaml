@@ -41,6 +41,24 @@ neural_controller:
     description: 'Velocity gains for the joints'
   }
 
+  init_kps: {
+    type: double_array,
+    default_value: [],
+    description: 'Position gains for the joints during initialization (return to default position)'
+  }
+
+  init_kds: {
+    type: double_array,
+    default_value: [],
+    description: 'Velocity gains for the joints during initialization (return to default position)'
+  }
+
+  init_duration: {
+    type: double,
+    default_value: 2.0,
+    description: 'Time to return to the default position after the controller is reset'
+  }
+
   lin_vel_scale: {
     type: double,
     default_value: 2.0,

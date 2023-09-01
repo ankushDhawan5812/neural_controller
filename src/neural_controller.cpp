@@ -94,12 +94,7 @@ namespace neural_controller
           std::ref(state_interface));
     }
 
-    // Set the kp and kd gains for each joint
-    for (int i = 0; i < ACTION_SIZE; i++)
-    {
-      command_interfaces_map_.at(params_.joint_names[i]).at("kp").get().set_value(params_.kps[i]);
-      command_interfaces_map_.at(params_.joint_names[i]).at("kd").get().set_value(params_.kds[i]);
-    }
+    init_time_ = get_node()->now();
 
     RCLCPP_INFO(get_node()->get_logger(), "activate successful");
     return controller_interface::CallbackReturn::SUCCESS;
@@ -120,6 +115,18 @@ namespace neural_controller
   controller_interface::return_type NeuralController::update(
       const rclcpp::Time &time, const rclcpp::Duration &period)
   {
+    // When started, return to the default joint positions
+    if ((time - init_time_).seconds() < params_.init_duration)
+    {
+      for (int i = 0; i < ACTION_SIZE; i++)
+      {
+        command_interfaces_map_.at(params_.joint_names[i]).at(params_.action_type).get().set_value(params_.default_joint_pos[i]);
+        command_interfaces_map_.at(params_.joint_names[i]).at("kp").get().set_value(params_.init_kps[i]);
+        command_interfaces_map_.at(params_.joint_names[i]).at("kd").get().set_value(params_.init_kds[i]);
+      }
+      return controller_interface::return_type::OK;
+    }
+
     // Get the latest commanded velocities
     auto command = rt_command_ptr_.readFromRT();
     if (command && command->get())
@@ -205,6 +212,8 @@ namespace neural_controller
       }
       // Send the action to the hardware interface
       command_interfaces_map_.at(params_.joint_names[i]).at(params_.action_type).get().set_value((double) action_[i]);
+      command_interfaces_map_.at(params_.joint_names[i]).at("kp").get().set_value(params_.kps[i]);
+      command_interfaces_map_.at(params_.joint_names[i]).at("kd").get().set_value(params_.kds[i]);
     }
 
     return controller_interface::return_type::OK;

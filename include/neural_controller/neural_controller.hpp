@@ -100,6 +100,8 @@ namespace neural_controller
     realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>> rt_command_ptr_;
     rclcpp::Subscription<CmdType>::SharedPtr cmd_subscriber_;
 
+    rclcpp::Time init_time_;
+
     float wrap_angle(float angle, float angle_min, float angle_max);
 
   };
