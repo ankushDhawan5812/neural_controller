@@ -1,0 +1,72 @@
+neural_controller:
+  publish_rate: {
+    type: double,
+    default_value: 50.0,
+    description: 'Rate at which to publish the controller state (Hz). Set to 0 to disable publishing.'
+  }
+
+  imu_sensor_name: {
+    type: string,
+    default_value: 'imu_sensor',
+    description: 'Name of the IMU sensor'
+  }
+
+  model_path: {
+    type: string,
+    default_value: 'model.json',
+    description: 'Path to the model weights'
+  }
+
+  joint_names: {
+    type: string_array,
+    default_value: [],
+    description: 'Names of the joints to control, in the order expected by the policy observation/action spaces'
+  }
+
+  default_joint_pos: {
+    type: double_array,
+    default_value: [],
+    description: 'Default joint positions to use when the controller is reset'
+  }
+
+  cmd_ang_vel_scale: {
+    type: double,
+    default_value: 1.0,
+    description: 'Scaling factor for the angular velocity command'
+  }
+
+  cmd_lin_vel_scale: {
+    type: double,
+    default_value: 1.0,
+    description: 'Scaling factor for the linear velocity command'
+  }
+
+  obs_ang_vel_scale: {
+    type: double,
+    default_value: 1.0,
+    description: 'Scaling factor for the angular velocity observation'
+  }
+
+  obs_joint_pos_scale: {
+    type: double,
+    default_value: 1.0,
+    description: 'Scaling factor for the joint position observation'
+  }
+
+  obs_joint_vel_scale: {
+    type: double,
+    default_value: 1.0,
+    description: 'Scaling factor for the joint velocity observation'
+  }
+
+  action_scale: {
+    type: double,
+    default_value: 1.0,
+    description: 'Scaling factor for the action'
+  }
+
+  action_type: {
+    type: string,
+    default_value: 'position',
+    description: 'Type of action: position or velocity'
+  }

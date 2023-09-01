@@ -16,11 +16,7 @@ find_package(realtime_tools REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(geometry_msgs REQUIRED)
-find_package(nav_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
-find_package(tf2_msgs REQUIRED)
 find_package(generate_parameter_library REQUIRED)
 
 generate_parameter_library(
@@ -28,7 +24,10 @@ generate_parameter_library(
   src/neural_controller_parameters.yaml # path to input yaml file
 )
 
-target_link_libraries(neural_controller neural_controller)
+set(RTNEURAL_XSIMD ON CACHE BOOL "Use RTNeural with this backend" FORCE)
+add_subdirectory(modules/RTNeural)
+
+target_link_libraries(neural_controller neural_controller_parameters RTNeural)
 
 target_include_directories(neural_controller PRIVATE include)
 
@@ -41,11 +40,7 @@ ament_target_dependencies(
   rclcpp
   rclcpp_lifecycle
   geometry_msgs
-  nav_msgs
-  sensor_msgs
-  std_msgs
   tf2
-  tf2_msgs
 )
 
 pluginlib_export_plugin_description_file(controller_interface neural_controller.xml)
