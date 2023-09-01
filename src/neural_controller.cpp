@@ -28,7 +28,6 @@ namespace neural_controller
       params_ = param_listener_->get_params();
 
       std::ifstream json_stream(params_.model_path, std::ifstream::binary);
-      model_.parseJson(json_stream);
       nlohmann::json model_json;
       json_stream >> model_json;
       RTNeural::torch_helpers::loadLSTM<float>(model_json, "memory.", model_.get<0>());

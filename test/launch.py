@@ -16,7 +16,8 @@ def generate_launch_description():
             " ",
             PathJoinSubstitution(
                 [
-                   FindPackageShare("rhea_description"),
+                #    FindPackageShare("rhea_description"),
+                    "/home/pi/ros2_ws/src/rhea_description",
                     "description",
                     "rhea.urdf.xacro",
                 ]
@@ -27,7 +28,8 @@ def generate_launch_description():
 
     robot_controllers = PathJoinSubstitution(
         [
-           FindPackageShare("neural_controller"),
+        #    FindPackageShare("neural_controller"),
+            "/home/pi/ros2_ws/src/neural_controller",
             "test",
             "config.yaml",
         ]

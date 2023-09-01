@@ -13,3 +13,4 @@ neural_controller:
     # kds: [10.0, 10.0, 0.5, 10.0, 10.0, 0.5]
     kds: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     action_type: "velocity"
+    model_path: "/home/pi/model_weights.json"
