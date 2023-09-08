@@ -94,7 +94,14 @@ namespace neural_controller
           std::ref(state_interface));
     }
 
+    // Store the initial joint positions
+    for (int i = 0; i < ACTION_SIZE; i++)
+    {
+      init_joint_pos_[i] = state_interfaces_map_.at(params_.joint_names[i]).at("position").get().get_value();
+    }
+
     init_time_ = get_node()->now();
+    repeat_action_counter_ = -1;
 
     RCLCPP_INFO(get_node()->get_logger(), "activate successful");
     return controller_interface::CallbackReturn::SUCCESS;
@@ -116,14 +123,35 @@ namespace neural_controller
       const rclcpp::Time &time, const rclcpp::Duration &period)
   {
     // When started, return to the default joint positions
-    if ((time - init_time_).seconds() < params_.init_duration)
+    double time_since_init = (time - init_time_).seconds();
+    if (time_since_init < params_.init_duration)
     {
       for (int i = 0; i < ACTION_SIZE; i++)
       {
-        command_interfaces_map_.at(params_.joint_names[i]).at(params_.action_type).get().set_value(params_.default_joint_pos[i]);
+        // Interpolate between the initial joint positions and the default joint positions
+        double interpolated_joint_pos = init_joint_pos_[i] * (1 - time_since_init / params_.init_duration) + params_.default_joint_pos[i] * (time_since_init / params_.init_duration);
+        command_interfaces_map_.at(params_.joint_names[i]).at(params_.action_types[i]).get().set_value(interpolated_joint_pos);
         command_interfaces_map_.at(params_.joint_names[i]).at("kp").get().set_value(params_.init_kps[i]);
         command_interfaces_map_.at(params_.joint_names[i]).at("kd").get().set_value(params_.init_kds[i]);
       }
+      return controller_interface::return_type::OK;
+    }
+
+    // If an emergency stop has been triggered, set all commands to 0 and return
+    if (estop_active_)
+    {
+      for (auto &command_interface : command_interfaces_)
+      {
+        command_interface.set_value(0.0);
+      }
+      return controller_interface::return_type::OK;
+    }
+
+    // Only get a new action from the policy when repeat_action_counter_ is 0
+    repeat_action_counter_ += 1;
+    repeat_action_counter_ %= params_.repeat_action;
+    if (repeat_action_counter_ != 0)
+    {
       return controller_interface::return_type::OK;
     }
 
@@ -159,6 +187,14 @@ namespace neural_controller
       tf2::Vector3 world_gravity_vector(0, 0, -1);
       tf2::Vector3 projected_gravity_vector = m.inverse() * world_gravity_vector;
 
+      // If the maximum body angle is exceeded, trigger an emergency stop
+      if (-projected_gravity_vector[2] < cos(params_.max_body_angle))
+      {
+        estop_active_ = true;
+        RCLCPP_INFO(get_node()->get_logger(), "Emergency stop triggered");
+        return controller_interface::return_type::OK;
+      }
+
       // Fill the observation vector
       // Linear velocity (zeroed out, this isn't observed)
       observation_[0] = 0.0;
@@ -179,7 +215,11 @@ namespace neural_controller
       // Joint positions
       for (int i = 0; i < ACTION_SIZE; i++)
       {
-        observation_[12 + i] = (float) wrap_angle((state_interfaces_map_.at(params_.joint_names[i]).at("position").get().get_value() - params_.default_joint_pos[i]) * params_.joint_pos_scale, -2 * M_PI, 2 * M_PI);
+        // Only include the joint position in the observation if the action type is position
+        if (params_.action_types[i] == "position")
+        {
+          observation_[12 + i] = (state_interfaces_map_.at(params_.joint_names[i]).at("position").get().get_value() - params_.default_joint_pos[i]) * params_.joint_pos_scale;
+        }
       }
       // Joint velocities
       for (int i = 0; i < ACTION_SIZE; i++)
@@ -203,27 +243,20 @@ namespace neural_controller
       // Copy policy_output to the observation vector
       observation_[12 + ACTION_SIZE * 2 + i] = policy_output[i];
       // Scale and de-normalize to get the action vector
-      if (params_.action_type == "position")
+      if (params_.action_types[i] == "P")
       {
-        action_[i] = policy_output[i] * params_.action_scale + params_.default_joint_pos[i];
+        action_[i] = policy_output[i] * params_.action_scales[i] + params_.default_joint_pos[i];
       }
       else {
-        action_[i] = policy_output[i] * params_.action_scale;
+        action_[i] = policy_output[i] * params_.action_scales[i];
       }
       // Send the action to the hardware interface
-      command_interfaces_map_.at(params_.joint_names[i]).at(params_.action_type).get().set_value((double) action_[i]);
+      command_interfaces_map_.at(params_.joint_names[i]).at(params_.action_types[i]).get().set_value((double) action_[i]);
       command_interfaces_map_.at(params_.joint_names[i]).at("kp").get().set_value(params_.kps[i]);
       command_interfaces_map_.at(params_.joint_names[i]).at("kd").get().set_value(params_.kds[i]);
     }
 
     return controller_interface::return_type::OK;
-  }
-
-  float NeuralController::wrap_angle(float angle, float angle_min, float angle_max)
-  {
-      /// Wraps an angle to the range [angle_min, angle_max] ///
-      float span = angle_max - angle_min;
-      return angle - span * floor((angle - angle_min) / span);
   }
 
 } // namespace neural_controller

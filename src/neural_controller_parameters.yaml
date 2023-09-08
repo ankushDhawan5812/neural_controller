@@ -5,6 +5,12 @@ neural_controller:
     description: 'Rate at which to publish the controller state (Hz). Set to 0 to disable publishing.'
   }
 
+  repeat_action: {
+    type: int,
+    default_value: 8,
+    description: 'Number of times to repeat the same action before querying the policy again'
+  }
+
   imu_sensor_name: {
     type: string,
     default_value: 'imu_sensor',
@@ -83,14 +89,20 @@ neural_controller:
     description: 'Scaling factor for the joint velocity observations'
   }
 
-  action_scale: {
-    type: double,
-    default_value: 1.0,
+  action_scales: {
+    type: double_array,
+    default_value: [],
     description: 'Scaling factor for the actions'
   }
 
-  action_type: {
-    type: string,
-    default_value: 'position',
-    description: 'Type of action: position or velocity'
+  action_types: {
+    type: string_array,
+    default_value: [],
+    description: 'Type of action for each joint: position or velocity'
+  }
+
+  max_body_angle: {
+    type: double,
+    default_value: 0.52,
+    description: 'Maximum body angle (rad) allowed before the controller is reset'
   }

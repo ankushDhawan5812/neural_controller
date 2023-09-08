@@ -102,8 +102,11 @@ namespace neural_controller
 
     rclcpp::Time init_time_;
 
-    float wrap_angle(float angle, float angle_min, float angle_max);
+    int repeat_action_counter_;
 
+    double init_joint_pos_[ACTION_SIZE];
+
+    bool estop_active_;
   };
 
 } // namespace neural_controller

@@ -1,6 +1,6 @@
 controller_manager:
   ros__parameters:
-    update_rate: 50  # Hz
+    update_rate: 400  # Hz
 
     neural_controller:
       type: neural_controller/NeuralController
@@ -9,13 +9,18 @@ neural_controller:
   ros__parameters:
     joint_names: ["left_hip", "left_knee", "left_wheel", "right_hip", "right_knee", "right_wheel"]
     default_joint_pos: [0.75, -1.5, 0.0, -0.75, 1.5, 0.0]
+    # kps: [20.0, 20.0, 0.0, 20.0, 20.0, 0.0]
+    # kds: [2.0, 2.0, 0.5, 2.0, 2.0, 0.5]
     kps: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    # kds: [10.0, 10.0, 0.5, 10.0, 10.0, 0.5]
-    kds: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    kds: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-    init_kps: [5.0, 5.0, 0.0, 5.0, 5.0, 0.0]
-    init_kds: [1.0, 1.0, 0.1, 1.0, 1.0, 0.1]
-    init_duration: 10.0
+    init_kps: [20.0, 20.0, 0.0, 20.0, 20.0, 0.0]
+    init_kds: [2.0, 2.0, 0.1, 2.0, 2.0, 0.1]
+    init_duration: 5.0
 
-    action_type: "velocity"
+    action_types: ["position", "position", "velocity", "position", "position", "velocity"]
+    action_scales: [1.0, 1.0, 10.0, 1.0, 1.0, 10.0]
+
+    max_body_angle: 0.52
+
     model_path: "/home/pi/model_weights.json"
