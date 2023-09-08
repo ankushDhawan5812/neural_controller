@@ -130,7 +130,7 @@ namespace neural_controller
       {
         // Interpolate between the initial joint positions and the default joint positions
         double interpolated_joint_pos = init_joint_pos_[i] * (1 - time_since_init / params_.init_duration) + params_.default_joint_pos[i] * (time_since_init / params_.init_duration);
-        command_interfaces_map_.at(params_.joint_names[i]).at(params_.action_types[i]).get().set_value(interpolated_joint_pos);
+        command_interfaces_map_.at(params_.joint_names[i]).at("position").get().set_value(interpolated_joint_pos);
         command_interfaces_map_.at(params_.joint_names[i]).at("kp").get().set_value(params_.init_kps[i]);
         command_interfaces_map_.at(params_.joint_names[i]).at("kd").get().set_value(params_.init_kds[i]);
       }
