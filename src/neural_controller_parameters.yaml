@@ -62,7 +62,13 @@ neural_controller:
   init_duration: {
     type: double,
     default_value: 2.0,
-    description: 'Time to return to the default position after the controller is reset'
+    description: 'Time to return to the default position on startup'
+  }
+
+  fade_in_duration: {
+    type: double,
+    default_value: 2.0,
+    description: 'Time to gradually fade in the policy actions on startup'
   }
 
   lin_vel_scale: {

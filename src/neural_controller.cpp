@@ -137,6 +137,10 @@ namespace neural_controller
       return controller_interface::return_type::OK;
     }
 
+    // After the init_duration has passed, fade in the policy actions
+    double time_since_fade_in = (time - init_time_).seconds() - params_.init_duration;
+    float fade_in_multiplier = std::min(time_since_fade_in / params_.fade_in_duration, 1.0);
+
     // If an emergency stop has been triggered, set all commands to 0 and return
     if (estop_active_)
     {
@@ -241,14 +245,14 @@ namespace neural_controller
     for (int i = 0; i < ACTION_SIZE; i++)
     {
       // Copy policy_output to the observation vector
-      observation_[12 + ACTION_SIZE * 2 + i] = policy_output[i];
+      observation_[12 + ACTION_SIZE * 2 + i] = fade_in_multiplier * policy_output[i];
       // Scale and de-normalize to get the action vector
       if (params_.action_types[i] == "P")
       {
-        action_[i] = policy_output[i] * params_.action_scales[i] + params_.default_joint_pos[i];
+        action_[i] = fade_in_multiplier * policy_output[i] * params_.action_scales[i] + params_.default_joint_pos[i];
       }
       else {
-        action_[i] = policy_output[i] * params_.action_scales[i];
+        action_[i] = fade_in_multiplier * policy_output[i] * params_.action_scales[i];
       }
       // Send the action to the hardware interface
       command_interfaces_map_.at(params_.joint_names[i]).at(params_.action_types[i]).get().set_value((double) action_[i]);
