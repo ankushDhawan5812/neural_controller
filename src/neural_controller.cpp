@@ -247,7 +247,7 @@ namespace neural_controller
       // Copy policy_output to the observation vector
       observation_[12 + ACTION_SIZE * 2 + i] = fade_in_multiplier * policy_output[i];
       // Scale and de-normalize to get the action vector
-      if (params_.action_types[i] == "P")
+      if (params_.action_types[i] == "position")
       {
         action_[i] = fade_in_multiplier * policy_output[i] * params_.action_scales[i] + params_.default_joint_pos[i];
       }
