@@ -103,6 +103,9 @@ namespace neural_controller
     init_time_ = get_node()->now();
     repeat_action_counter_ = -1;
 
+    cmd_x_vel_ = params_.default_cmd_x_vel;
+    cmd_yaw_vel_ = params_.default_cmd_yaw_vel;
+
     RCLCPP_INFO(get_node()->get_logger(), "activate successful");
     return controller_interface::CallbackReturn::SUCCESS;
   }
@@ -237,6 +240,12 @@ namespace neural_controller
       return controller_interface::return_type::OK;
     }
 
+    // Clip the observation vector
+    for (int i = 0; i < OBSERVATION_SIZE; i++)
+    {
+      observation_[i] = std::max(std::min(observation_[i], (float) params_.observation_limit), (float) -params_.observation_limit);
+    }
+
     // Perform policy inference
     model_.forward(observation_);
 
@@ -244,21 +253,27 @@ namespace neural_controller
     const float* policy_output = model_.getOutputs();
     for (int i = 0; i < ACTION_SIZE; i++)
     {
+      // Clip the action
+      float action_clipped = std::max(std::min(policy_output[i], (float) params_.action_limit), (float) -params_.action_limit);
       // Copy policy_output to the observation vector
-      observation_[12 + ACTION_SIZE * 2 + i] = fade_in_multiplier * policy_output[i];
+      observation_[12 + ACTION_SIZE * 2 + i] = fade_in_multiplier * action_clipped;
       // Scale and de-normalize to get the action vector
       if (params_.action_types[i] == "position")
       {
-        action_[i] = fade_in_multiplier * policy_output[i] * params_.action_scales[i] + params_.default_joint_pos[i];
+        action_[i] = fade_in_multiplier * action_clipped * params_.action_scales[i] + params_.default_joint_pos[i];
       }
       else {
-        action_[i] = fade_in_multiplier * policy_output[i] * params_.action_scales[i];
+        action_[i] = fade_in_multiplier * action_clipped * params_.action_scales[i];
       }
       // Send the action to the hardware interface
       command_interfaces_map_.at(params_.joint_names[i]).at(params_.action_types[i]).get().set_value((double) action_[i]);
       command_interfaces_map_.at(params_.joint_names[i]).at("kp").get().set_value(params_.kps[i]);
       command_interfaces_map_.at(params_.joint_names[i]).at("kd").get().set_value(params_.kds[i]);
     }
+
+    // Get the policy inference time
+    // double policy_inference_time = (get_node()->now() - time).seconds();
+    // RCLCPP_INFO(get_node()->get_logger(), "policy inference time: %f", policy_inference_time);
 
     return controller_interface::return_type::OK;
   }

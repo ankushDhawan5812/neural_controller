@@ -107,6 +107,30 @@ neural_controller:
     description: 'Type of action for each joint: position or velocity'
   }
 
+  action_limit: {
+    type: double,
+    default_value: 1.0,
+    description: 'Maximum action value before scaling'
+  }
+
+  observation_limit: {
+    type: double,
+    default_value: 1000.0,
+    description: 'Maximum observation value before scaling'
+  }
+
+  default_cmd_x_vel: {
+    type: double,
+    default_value: 0.0,
+    description: 'Default linear velocity command'
+  }
+
+  default_cmd_yaw_vel: {
+    type: double,
+    default_value: 0.0,
+    description: 'Default angular velocity command'
+  }
+
   max_body_angle: {
     type: double,
     default_value: 0.52,

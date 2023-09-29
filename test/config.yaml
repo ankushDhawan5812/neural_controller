@@ -7,19 +7,29 @@ controller_manager:
 
 neural_controller:
   ros__parameters:
+    repeat_action: 8
+
     joint_names: ["left_hip", "left_knee", "left_wheel", "right_hip", "right_knee", "right_wheel"]
     default_joint_pos: [0.75, -1.5, 0.0, -0.75, 1.5, 0.0]
-    # kps: [20.0, 20.0, 0.0, 20.0, 20.0, 0.0]
-    # kds: [2.0, 2.0, 0.5, 2.0, 2.0, 0.5]
-    kps: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    kds: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    kps: [20.0, 20.0, 0.0, 20.0, 20.0, 0.0]
+    kds: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+    # kps: [10.0, 10.0, 0.0, 10.0, 10.0, 0.0]
+    # kds: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
 
     init_kps: [20.0, 20.0, 0.0, 20.0, 20.0, 0.0]
-    init_kds: [2.0, 2.0, 0.1, 2.0, 2.0, 0.1]
-    init_duration: 5.0
+    init_kds: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+    # init_kps: [10.0, 10.0, 0.0, 10.0, 10.0, 0.0]
+    # init_kds: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    init_duration: 10.0
+    fade_in_duration: 2.0
 
     action_types: ["position", "position", "velocity", "position", "position", "velocity"]
-    action_scales: [1.0, 1.0, 10.0, 1.0, 1.0, 10.0]
+    action_scales: [0.25, 0.25, 10.0, 0.25, 0.25, 10.0]
+    # action_scales: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+    action_limit: 1.0
+
+    default_cmd_x_vel: 0.5
 
     max_body_angle: 0.52
 
