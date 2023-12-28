@@ -5,6 +5,10 @@ This repository aims to ease the deployment of neural network control policies o
 Getting a policy up and running on real hardware can be surprisingly tricky. Many opportunities exist for mistakes in processing the observations and actions. 
 Furthermore, common neural network libraries such as Torch are not designed to run in a real-time control loop, introducing latency/jitter that increases the difficulty of sim-to-real transfer. 
 
+# Install
+`git clone git@github.com:G-Levine/neural_controller.git --recurse-submodules` \
+(Submodules must be recursively cloned)
+
 # Functionality
 ## Inputs
 - Maps hardware_interface states and ROS topics (such as cmd_vel) to the policy obersvation vector
