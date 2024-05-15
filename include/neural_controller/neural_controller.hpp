@@ -62,7 +62,7 @@ class NeuralController : public controller_interface::ControllerInterface {
                                           + ACTION_SIZE; /* previous action */
   /* ----------------------------------------------- */
 
-  RTNeural::Model<float> model_;
+  std::shared_ptr<::Model<float>> model_;
 
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;

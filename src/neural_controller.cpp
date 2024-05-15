@@ -259,10 +259,10 @@ controller_interface::return_type NeuralController::update(
   }
 
   // Perform policy inference
-  model_.forward(observation_);
+  model_->forward(observation_);
 
   // Process the actions
-  const float *policy_output = model_.getOutputs();
+  const float *policy_output = model_->getOutputs();
   for (int i = 0; i < ACTION_SIZE; i++) {
     // Clip the action
     float action_clipped =
