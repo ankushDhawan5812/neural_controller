@@ -21,7 +21,6 @@ Furthermore, common neural network libraries such as Torch are not designed to r
 
 ## Convenience and safety features
 - On startup, smoothly returns the robot to a predefined starting pose
-- Easy loading of policies trained in Isaac Gym (just drag and drop a new .pt file)
 - Triggers an emergency stop when safety limits are exceeded (joint velocity, body pitch, etc.)
 
 ## How to configure

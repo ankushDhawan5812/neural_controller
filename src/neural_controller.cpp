@@ -23,19 +23,7 @@ controller_interface::CallbackReturn NeuralController::on_init() {
     params_ = param_listener_->get_params();
 
     std::ifstream json_stream(params_.model_path, std::ifstream::binary);
-    nlohmann::json model_json;
-    json_stream >> model_json;
-    RTNeural::torch_helpers::loadLSTM<float>(model_json, "memory.",
-                                             model_.get<0>());
-    RTNeural::torch_helpers::loadDense<float>(model_json, "actor.0.",
-                                              model_.get<1>());
-    RTNeural::torch_helpers::loadDense<float>(model_json, "actor.2.",
-                                              model_.get<3>());
-    RTNeural::torch_helpers::loadDense<float>(model_json, "actor.4.",
-                                              model_.get<5>());
-    RTNeural::torch_helpers::loadDense<float>(model_json, "actor.6.",
-                                              model_.get<7>());
-    model_.reset();
+    model_ = RTNeural::json_parser::parseJson<float>(json_stream, true);
   } catch (const std::exception &e) {
     fprintf(stderr, "Exception thrown during init stage with message: %s \n",
             e.what());
@@ -91,8 +79,9 @@ controller_interface::CallbackReturn NeuralController::on_activate(
   init_time_ = get_node()->now();
   repeat_action_counter_ = -1;
 
-  cmd_x_vel_ = params_.default_cmd_x_vel;
-  cmd_yaw_vel_ = params_.default_cmd_yaw_vel;
+  cmd_x_vel_ = 0.0;
+  cmd_y_vel_ = 0.0;
+  cmd_yaw_vel_ = 0.0;
 
   // Initialize the command subscriber
   cmd_subscriber_ = get_node()->create_subscription<CmdType>(
@@ -174,19 +163,19 @@ controller_interface::return_type NeuralController::update(
   }
 
   // Get the latest observation
-  double pitch_vel, roll_vel, yaw_vel, orientation_w, orientation_x,
+  double ang_vel_x, ang_vel_y, ang_vel_z, orientation_w, orientation_x,
       orientation_y, orientation_z;
   try {
     // read IMU states from hardware interface
-    pitch_vel = state_interfaces_map_.at(params_.imu_sensor_name)
-                    .at("angular_velocity.y")
-                    .get()
-                    .get_value();
-    roll_vel = state_interfaces_map_.at(params_.imu_sensor_name)
+    ang_vel_x = state_interfaces_map_.at(params_.imu_sensor_name)
                    .at("angular_velocity.x")
                    .get()
                    .get_value();
-    yaw_vel = state_interfaces_map_.at(params_.imu_sensor_name)
+    ang_vel_y = state_interfaces_map_.at(params_.imu_sensor_name)
+                    .at("angular_velocity.y")
+                    .get()
+                    .get_value();
+    ang_vel_z = state_interfaces_map_.at(params_.imu_sensor_name)
                   .at("angular_velocity.z")
                   .get()
                   .get_value();
@@ -222,28 +211,24 @@ controller_interface::return_type NeuralController::update(
     }
 
     // Fill the observation vector
-    // Linear velocity (zeroed out, this isn't observed)
-    observation_[0] = 0.0;
-    observation_[1] = 0.0;
-    observation_[2] = 0.0;
     // Angular velocity
-    observation_[3] = (float)pitch_vel * params_.ang_vel_scale;
-    observation_[4] = (float)roll_vel * params_.ang_vel_scale;
-    observation_[5] = (float)yaw_vel * params_.ang_vel_scale;
+    observation_[0] = (float)ang_vel_x * params_.ang_vel_scale;
+    observation_[1] = (float)ang_vel_y * params_.ang_vel_scale;
+    observation_[2] = (float)ang_vel_z * params_.ang_vel_scale;
     // Projected gravity vector
-    observation_[6] = (float)projected_gravity_vector[0];
-    observation_[7] = (float)projected_gravity_vector[1];
-    observation_[8] = (float)projected_gravity_vector[2];
+    observation_[3] = (float)projected_gravity_vector[0];
+    observation_[4] = (float)projected_gravity_vector[1];
+    observation_[5] = (float)projected_gravity_vector[2];
     // Commands
-    observation_[9] = (float)cmd_x_vel_ * params_.lin_vel_scale;
-    observation_[10] = (float)cmd_y_vel_ * params_.lin_vel_scale;
-    observation_[11] = (float)cmd_yaw_vel_ * params_.ang_vel_scale;
+    observation_[6] = (float)cmd_x_vel_ * params_.lin_vel_scale;
+    observation_[7] = (float)cmd_y_vel_ * params_.lin_vel_scale;
+    observation_[8] = (float)cmd_yaw_vel_ * params_.ang_vel_scale;
     // Joint positions
     for (int i = 0; i < ACTION_SIZE; i++) {
       // Only include the joint position in the observation if the action type
       // is position
       if (params_.action_types[i] == "position") {
-        observation_[12 + i] = (state_interfaces_map_.at(params_.joint_names[i])
+        observation_[9 + i] = (state_interfaces_map_.at(params_.joint_names[i])
                                     .at("position")
                                     .get()
                                     .get_value() -
@@ -253,7 +238,7 @@ controller_interface::return_type NeuralController::update(
     }
     // Joint velocities
     for (int i = 0; i < ACTION_SIZE; i++) {
-      observation_[12 + ACTION_SIZE + i] =
+      observation_[9 + ACTION_SIZE + i] =
           (float)state_interfaces_map_.at(params_.joint_names[i])
               .at("velocity")
               .get()
@@ -284,7 +269,7 @@ controller_interface::return_type NeuralController::update(
         std::max(std::min(policy_output[i], (float)params_.action_limit),
                  (float)-params_.action_limit);
     // Copy policy_output to the observation vector
-    observation_[12 + ACTION_SIZE * 2 + i] =
+    observation_[9 + ACTION_SIZE * 2 + i] =
         fade_in_multiplier * action_clipped;
     // Scale and de-normalize to get the action vector
     if (params_.action_types[i] == "position") {

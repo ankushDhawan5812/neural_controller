@@ -16,10 +16,9 @@ def generate_launch_description():
             " ",
             PathJoinSubstitution(
                 [
-                #    FindPackageShare("rhea_description"),
-                    "/home/pi/ros2_ws/src/rhea_description",
+                    FindPackageShare("pupper_v3_description"),
                     "description",
-                    "rhea.urdf.xacro",
+                    "pupper_v3.urdf.xacro",
                 ]
             ),
         ]
@@ -28,11 +27,24 @@ def generate_launch_description():
 
     robot_controllers = PathJoinSubstitution(
         [
-        #    FindPackageShare("neural_controller"),
-            "/home/pi/ros2_ws/src/neural_controller",
-            "test",
+            FindPackageShare("neural_controller"),
+            "launch",
             "config.yaml",
         ]
+    )
+
+    joy_node = Node(
+        package="joy",
+        executable="joy_node",
+        parameters=[robot_controllers],
+        output="both",
+    )
+
+    teleop_twist_joy_node = Node(
+        package="teleop_twist_joy",
+        executable="teleop_node",
+        parameters=[robot_controllers],
+        output="both",
     )
 
     control_node = Node(
@@ -51,6 +63,8 @@ def generate_launch_description():
     nodes = [
         control_node,
         robot_controller_spawner,
+        joy_node,
+        teleop_twist_joy_node
     ]
 
     return LaunchDescription(nodes)

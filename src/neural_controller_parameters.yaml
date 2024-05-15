@@ -1,25 +1,13 @@
 neural_controller:
-  publish_rate: {
-    type: double,
-    default_value: 50.0,
-    description: 'Rate at which to publish the controller state (Hz). Set to 0 to disable publishing.'
-  }
-
   repeat_action: {
     type: int,
     default_value: 8,
     description: 'Number of times to repeat the same action before querying the policy again'
   }
 
-  imu_sensor_name: {
-    type: string,
-    default_value: 'imu_sensor',
-    description: 'Name of the IMU sensor'
-  }
-
   model_path: {
     type: string,
-    default_value: '/home/pi/model_weights.json',
+    default_value: '/home/pi/policy.json',
     description: 'Path to the model weights'
   }
 
@@ -115,20 +103,8 @@ neural_controller:
 
   observation_limit: {
     type: double,
-    default_value: 1000.0,
+    default_value: 100.0,
     description: 'Maximum observation value before scaling'
-  }
-
-  default_cmd_x_vel: {
-    type: double,
-    default_value: 0.0,
-    description: 'Default linear velocity command'
-  }
-
-  default_cmd_yaw_vel: {
-    type: double,
-    default_value: 0.0,
-    description: 'Default angular velocity command'
   }
 
   max_body_angle: {

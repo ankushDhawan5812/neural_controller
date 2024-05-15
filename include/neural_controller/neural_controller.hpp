@@ -53,32 +53,16 @@ class NeuralController : public controller_interface::ControllerInterface {
 
  protected:
   /* ----------------- Layer sizes ----------------- */
-  static constexpr int ACTION_SIZE = 6;
-  static constexpr int OBSERVATION_SIZE = 3   /* base link linear velocity */
-                                          + 3 /* base link angular velocity */
+  static constexpr int ACTION_SIZE = 12;
+  static constexpr int OBSERVATION_SIZE = + 3 /* base link angular velocity */
                                           + 3 /* projected gravity vector */
                                           + 3 /* x, y, yaw velocity commands */
                                           + ACTION_SIZE  /* joint positions */
                                           + ACTION_SIZE  /* joint velocities */
                                           + ACTION_SIZE; /* previous action */
-  static constexpr int LSTM_SIZE = 512;
-  static constexpr int DENSE_0_SIZE = 512;
-  static constexpr int DENSE_1_SIZE = 256;
-  static constexpr int DENSE_2_SIZE = 128;
   /* ----------------------------------------------- */
 
-  /* ----------------- Model definition ----------------- */
-  RTNeural::ModelT<float, OBSERVATION_SIZE, ACTION_SIZE,
-                   RTNeural::LSTMLayerT<float, OBSERVATION_SIZE, LSTM_SIZE>,
-                   RTNeural::DenseT<float, LSTM_SIZE, DENSE_0_SIZE>,
-                   RTNeural::ELuActivationT<float, DENSE_0_SIZE>,
-                   RTNeural::DenseT<float, DENSE_0_SIZE, DENSE_1_SIZE>,
-                   RTNeural::ELuActivationT<float, DENSE_1_SIZE>,
-                   RTNeural::DenseT<float, DENSE_1_SIZE, DENSE_2_SIZE>,
-                   RTNeural::ELuActivationT<float, DENSE_2_SIZE>,
-                   RTNeural::DenseT<float, DENSE_2_SIZE, ACTION_SIZE>>
-      model_;
-  /* ----------------------------------------------------- */
+  RTNeural::Model model_;
 
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;

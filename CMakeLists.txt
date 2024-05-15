@@ -24,7 +24,7 @@ generate_parameter_library(
   src/neural_controller_parameters.yaml # path to input yaml file
 )
 
-set(RTNEURAL_XSIMD ON CACHE BOOL "Use RTNeural with this backend" FORCE)
+set(RTNEURAL_EIGEN ON CACHE BOOL "Use RTNeural with this backend" FORCE)
 add_subdirectory(modules/RTNeural)
 
 target_link_libraries(neural_controller neural_controller_parameters RTNeural)
@@ -53,10 +53,10 @@ install(
   DIRECTORY include/
   DESTINATION include
 )
-# install(
-#   DIRECTORY test/
-#   DESTINATION test
-# )
+install(
+  DIRECTORY launch/
+  DESTINATION launch
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
