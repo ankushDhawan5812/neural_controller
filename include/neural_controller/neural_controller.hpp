@@ -31,11 +31,9 @@ class NeuralController : public controller_interface::ControllerInterface {
 
   ~NeuralController() = default;
 
-  controller_interface::InterfaceConfiguration command_interface_configuration()
-      const override;
+  controller_interface::InterfaceConfiguration command_interface_configuration() const override;
 
-  controller_interface::InterfaceConfiguration state_interface_configuration()
-      const override;
+  controller_interface::InterfaceConfiguration state_interface_configuration() const override;
 
   controller_interface::CallbackReturn on_init() override;
 
@@ -48,18 +46,18 @@ class NeuralController : public controller_interface::ControllerInterface {
   controller_interface::CallbackReturn on_deactivate(
       const rclcpp_lifecycle::State &previous_state) override;
 
-  controller_interface::return_type update(
-      const rclcpp::Time &time, const rclcpp::Duration &period) override;
+  controller_interface::return_type update(const rclcpp::Time &time,
+                                           const rclcpp::Duration &period) override;
 
  protected:
   /* ----------------- Layer sizes ----------------- */
   static constexpr int OBSERVATION_HISTORY = 4;
   static constexpr int ACTION_SIZE = 12;
-  static constexpr int SINGLE_OBSERVATION_SIZE = 3 /* base link angular velocity */
-                                                + 3 /* projected gravity vector */
-                                                + 3 /* x, y, yaw velocity commands */
-                                                + ACTION_SIZE  /* joint positions */
-                                                + ACTION_SIZE; /* previous action */
+  static constexpr int SINGLE_OBSERVATION_SIZE = 3              /* base link angular velocity */
+                                                 + 3            /* projected gravity vector */
+                                                 + 3            /* x, y, yaw velocity commands */
+                                                 + ACTION_SIZE  /* joint positions */
+                                                 + ACTION_SIZE; /* previous action */
   static constexpr int OBSERVATION_SIZE = OBSERVATION_HISTORY * SINGLE_OBSERVATION_SIZE;
   /* ----------------------------------------------- */
 
@@ -76,14 +74,12 @@ class NeuralController : public controller_interface::ControllerInterface {
   // Map from joint names to command types to command interfaces
   std::map<
       std::string,
-      std::map<std::string, std::reference_wrapper<
-                                hardware_interface::LoanedCommandInterface>>>
+      std::map<std::string, std::reference_wrapper<hardware_interface::LoanedCommandInterface>>>
       command_interfaces_map_;
 
   // Map from joint/sensor names to state types to state interfaces
   std::map<std::string,
-           std::map<std::string, std::reference_wrapper<
-                                     hardware_interface::LoanedStateInterface>>>
+           std::map<std::string, std::reference_wrapper<hardware_interface::LoanedStateInterface>>>
       state_interfaces_map_;
 
   realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>> rt_command_ptr_;

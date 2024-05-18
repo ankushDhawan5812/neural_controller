@@ -25,8 +25,7 @@ controller_interface::CallbackReturn NeuralController::on_init() {
     std::ifstream json_stream(params_.model_path, std::ifstream::binary);
     model_ = RTNeural::json_parser::parseJson<float>(json_stream, true);
   } catch (const std::exception &e) {
-    fprintf(stderr, "Exception thrown during init stage with message: %s \n",
-            e.what());
+    fprintf(stderr, "Exception thrown during init stage with message: %s \n", e.what());
     return controller_interface::CallbackReturn::ERROR;
   }
 
@@ -39,22 +38,21 @@ controller_interface::CallbackReturn NeuralController::on_configure(
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::InterfaceConfiguration
-NeuralController::command_interface_configuration() const {
+controller_interface::InterfaceConfiguration NeuralController::command_interface_configuration()
+    const {
   return controller_interface::InterfaceConfiguration{
       controller_interface::interface_configuration_type::ALL};
 }
 
-controller_interface::InterfaceConfiguration
-NeuralController::state_interface_configuration() const {
+controller_interface::InterfaceConfiguration NeuralController::state_interface_configuration()
+    const {
   return controller_interface::InterfaceConfiguration{
       controller_interface::interface_configuration_type::ALL};
 }
 
 controller_interface::CallbackReturn NeuralController::on_activate(
     const rclcpp_lifecycle::State & /*previous_state*/) {
-  rt_command_ptr_ =
-      realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
+  rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
 
   // Populate the command interfaces map
   for (auto &command_interface : command_interfaces_) {
@@ -70,10 +68,8 @@ controller_interface::CallbackReturn NeuralController::on_activate(
 
   // Store the initial joint positions
   for (int i = 0; i < ACTION_SIZE; i++) {
-    init_joint_pos_[i] = state_interfaces_map_.at(params_.joint_names[i])
-                             .at("position")
-                             .get()
-                             .get_value();
+    init_joint_pos_[i] =
+        state_interfaces_map_.at(params_.joint_names[i]).at("position").get().get_value();
   }
 
   init_time_ = get_node()->now();
@@ -91,9 +87,7 @@ controller_interface::CallbackReturn NeuralController::on_activate(
   // Initialize the command subscriber
   cmd_subscriber_ = get_node()->create_subscription<CmdType>(
       "/cmd_vel", rclcpp::SystemDefaultsQoS(),
-      [this](const CmdType::SharedPtr msg) {
-        rt_command_ptr_.writeFromNonRT(msg);
-      });
+      [this](const CmdType::SharedPtr msg) { rt_command_ptr_.writeFromNonRT(msg); });
 
   RCLCPP_INFO(get_node()->get_logger(), "activate successful");
   return controller_interface::CallbackReturn::SUCCESS;
@@ -101,8 +95,7 @@ controller_interface::CallbackReturn NeuralController::on_activate(
 
 controller_interface::CallbackReturn NeuralController::on_deactivate(
     const rclcpp_lifecycle::State & /*previous_state*/) {
-  rt_command_ptr_ =
-      realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
+  rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
   for (auto &command_interface : command_interfaces_) {
     command_interface.set_value(0.0);
   }
@@ -110,8 +103,8 @@ controller_interface::CallbackReturn NeuralController::on_deactivate(
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::return_type NeuralController::update(
-    const rclcpp::Time &time, const rclcpp::Duration &period) {
+controller_interface::return_type NeuralController::update(const rclcpp::Time &time,
+                                                           const rclcpp::Duration &period) {
   // When started, return to the default joint positions
   double time_since_init = (time - init_time_).seconds();
   if (time_since_init < params_.init_duration) {
@@ -120,8 +113,7 @@ controller_interface::return_type NeuralController::update(
       // positions
       double interpolated_joint_pos =
           init_joint_pos_[i] * (1 - time_since_init / params_.init_duration) +
-          params_.default_joint_pos[i] *
-              (time_since_init / params_.init_duration);
+          params_.default_joint_pos[i] * (time_since_init / params_.init_duration);
       command_interfaces_map_.at(params_.joint_names[i])
           .at("position")
           .get()
@@ -139,10 +131,8 @@ controller_interface::return_type NeuralController::update(
   }
 
   // After the init_duration has passed, fade in the policy actions
-  double time_since_fade_in =
-      (time - init_time_).seconds() - params_.init_duration;
-  float fade_in_multiplier =
-      std::min(time_since_fade_in / params_.fade_in_duration, 1.0);
+  double time_since_fade_in = (time - init_time_).seconds() - params_.init_duration;
+  float fade_in_multiplier = std::min(time_since_fade_in / params_.fade_in_duration, 1.0);
 
   // If an emergency stop has been triggered, set all commands to 0 and return
   if (estop_active_) {
@@ -168,42 +158,33 @@ controller_interface::return_type NeuralController::update(
   }
 
   // Get the latest observation
-  double ang_vel_x, ang_vel_y, ang_vel_z, orientation_w, orientation_x,
-      orientation_y, orientation_z;
+  double ang_vel_x, ang_vel_y, ang_vel_z, orientation_w, orientation_x, orientation_y,
+      orientation_z;
   try {
     // read IMU states from hardware interface
     ang_vel_x = state_interfaces_map_.at(params_.imu_sensor_name)
-                   .at("angular_velocity.x")
-                   .get()
-                   .get_value();
+                    .at("angular_velocity.x")
+                    .get()
+                    .get_value();
     ang_vel_y = state_interfaces_map_.at(params_.imu_sensor_name)
                     .at("angular_velocity.y")
                     .get()
                     .get_value();
     ang_vel_z = state_interfaces_map_.at(params_.imu_sensor_name)
-                  .at("angular_velocity.z")
-                  .get()
-                  .get_value();
-    orientation_w = state_interfaces_map_.at(params_.imu_sensor_name)
-                        .at("orientation.w")
-                        .get()
-                        .get_value();
-    orientation_x = state_interfaces_map_.at(params_.imu_sensor_name)
-                        .at("orientation.x")
-                        .get()
-                        .get_value();
-    orientation_y = state_interfaces_map_.at(params_.imu_sensor_name)
-                        .at("orientation.y")
-                        .get()
-                        .get_value();
-    orientation_z = state_interfaces_map_.at(params_.imu_sensor_name)
-                        .at("orientation.z")
-                        .get()
-                        .get_value();
+                    .at("angular_velocity.z")
+                    .get()
+                    .get_value();
+    orientation_w =
+        state_interfaces_map_.at(params_.imu_sensor_name).at("orientation.w").get().get_value();
+    orientation_x =
+        state_interfaces_map_.at(params_.imu_sensor_name).at("orientation.x").get().get_value();
+    orientation_y =
+        state_interfaces_map_.at(params_.imu_sensor_name).at("orientation.y").get().get_value();
+    orientation_z =
+        state_interfaces_map_.at(params_.imu_sensor_name).at("orientation.z").get().get_value();
 
     // Calculate the projected gravity vector
-    tf2::Quaternion q(orientation_x, orientation_y, orientation_z,
-                      orientation_w);
+    tf2::Quaternion q(orientation_x, orientation_y, orientation_z, orientation_w);
     tf2::Matrix3x3 m(q);
     tf2::Vector3 world_gravity_vector(0, 0, -1);
     tf2::Vector3 projected_gravity_vector = m.inverse() * world_gravity_vector;
@@ -233,25 +214,21 @@ controller_interface::return_type NeuralController::update(
       // Only include the joint position in the observation if the action type
       // is position
       if (params_.action_types[i] == "position") {
-        observation_[9 + i] = (state_interfaces_map_.at(params_.joint_names[i])
-                                    .at("position")
-                                    .get()
-                                    .get_value() -
-                                params_.default_joint_pos[i]) *
-                               params_.joint_pos_scale;
+        observation_[9 + i] =
+            (state_interfaces_map_.at(params_.joint_names[i]).at("position").get().get_value() -
+             params_.default_joint_pos[i]) *
+            params_.joint_pos_scale;
       }
     }
   } catch (const std::out_of_range &e) {
-    RCLCPP_INFO(get_node()->get_logger(),
-                "failed to read joint states from hardware interface");
+    RCLCPP_INFO(get_node()->get_logger(), "failed to read joint states from hardware interface");
     return controller_interface::return_type::OK;
   }
 
   // Clip the observation vector
   for (int i = 0; i < OBSERVATION_SIZE; i++) {
-    observation_[i] =
-        std::max(std::min(observation_[i], (float)params_.observation_limit),
-                 (float)-params_.observation_limit);
+    observation_[i] = std::max(std::min(observation_[i], (float)params_.observation_limit),
+                               (float)-params_.observation_limit);
   }
 
   // Perform policy inference
@@ -266,34 +243,24 @@ controller_interface::return_type NeuralController::update(
   const float *policy_output = model_->getOutputs();
   for (int i = 0; i < ACTION_SIZE; i++) {
     // Clip the action
-    float action_clipped =
-        std::max(std::min(policy_output[i], (float)params_.action_limit),
-                 (float)-params_.action_limit);
+    float action_clipped = std::max(std::min(policy_output[i], (float)params_.action_limit),
+                                    (float)-params_.action_limit);
     // Copy policy_output to the observation vector
-    observation_[9 + ACTION_SIZE + i] =
-        fade_in_multiplier * action_clipped;
+    observation_[9 + ACTION_SIZE + i] = fade_in_multiplier * action_clipped;
     // Scale and de-normalize to get the action vector
     if (params_.action_types[i] == "position") {
-      action_[i] =
-          fade_in_multiplier * action_clipped * params_.action_scales[i] +
-          params_.default_joint_pos[i];
+      action_[i] = fade_in_multiplier * action_clipped * params_.action_scales[i] +
+                   params_.default_joint_pos[i];
     } else {
-      action_[i] =
-          fade_in_multiplier * action_clipped * params_.action_scales[i];
+      action_[i] = fade_in_multiplier * action_clipped * params_.action_scales[i];
     }
     // Send the action to the hardware interface
     command_interfaces_map_.at(params_.joint_names[i])
         .at(params_.action_types[i])
         .get()
         .set_value((double)action_[i]);
-    command_interfaces_map_.at(params_.joint_names[i])
-        .at("kp")
-        .get()
-        .set_value(params_.kps[i]);
-    command_interfaces_map_.at(params_.joint_names[i])
-        .at("kd")
-        .get()
-        .set_value(params_.kds[i]);
+    command_interfaces_map_.at(params_.joint_names[i]).at("kp").get().set_value(params_.kps[i]);
+    command_interfaces_map_.at(params_.joint_names[i]).at("kd").get().set_value(params_.kds[i]);
   }
 
   // Get the policy inference time
