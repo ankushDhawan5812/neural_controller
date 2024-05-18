@@ -1,6 +1,6 @@
 controller_manager:
   ros__parameters:
-    update_rate: 100 # Hz
+    update_rate: 500 # Hz
 
     neural_controller:
       type: neural_controller/NeuralController
@@ -10,7 +10,7 @@ controller_manager:
 
 neural_controller:
   ros__parameters:
-    repeat_action: 8
+    repeat_action: 10
 
     joint_names:
       [
@@ -29,12 +29,12 @@ neural_controller:
       ]
 
     default_joint_pos:
-      [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    kps: [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
-    kds: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+      [0.26, 0.0, -0.52, -0.26, 0.0, 0.52, 0.26, 0.0, -0.52, -0.26, 0.0, 0.52]
+    kps: [7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5]
+    kds: [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
 
-    init_kps: [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
-    init_kds: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    init_kps: [7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5]
+    init_kds: [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
 
     init_duration: 2.0
     fade_in_duration: 2.0
@@ -60,7 +60,7 @@ neural_controller:
 
     max_body_angle: 1.5
 
-    model_path: "/home/pi/policy.json"
+    model_path: "$(find-pkg-share neural_controller)/launch/policy.json"
 
 teleop_twist_joy_node:
   ros__parameters:
@@ -74,7 +74,7 @@ teleop_twist_joy_node:
     axis_angular:
       yaw: 3
     scale_angular:
-      yaw: 1.5
+      yaw: 2.0
 
     require_enable_button: false
 
@@ -85,4 +85,5 @@ joy_node:
 
 joint_state_broadcaster:
   ros__parameters:
+    update_rate: 50
     use_local_topics: false

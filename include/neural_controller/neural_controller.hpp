@@ -51,7 +51,7 @@ class NeuralController : public controller_interface::ControllerInterface {
 
  protected:
   /* ----------------- Layer sizes ----------------- */
-  static constexpr int OBSERVATION_HISTORY = 4;
+  static constexpr int OBSERVATION_HISTORY = 2;
   static constexpr int ACTION_SIZE = 12;
   static constexpr int SINGLE_OBSERVATION_SIZE = 3              /* base link angular velocity */
                                                  + 3            /* projected gravity vector */

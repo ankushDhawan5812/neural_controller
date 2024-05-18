@@ -7,7 +7,7 @@ neural_controller:
 
   model_path: {
     type: string,
-    default_value: '/home/pi/policy.json',
+    default_value: '',
     description: 'Path to the model weights'
   }
 
