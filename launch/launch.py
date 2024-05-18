@@ -60,9 +60,16 @@ def generate_launch_description():
         arguments=["neural_controller", "--controller-manager", "/controller_manager", "--controller-manager-timeout", "30"],
     )
 
+    joint_state_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager", "--controller-manager-timeout", "30"],
+    )
+
     nodes = [
         control_node,
         robot_controller_spawner,
+        joint_state_broadcaster_spawner,
         joy_node,
         teleop_twist_joy_node
     ]
