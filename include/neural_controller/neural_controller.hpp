@@ -53,13 +53,14 @@ class NeuralController : public controller_interface::ControllerInterface {
 
  protected:
   /* ----------------- Layer sizes ----------------- */
+  static constexpr int OBSERVATION_HISTORY = 4;
   static constexpr int ACTION_SIZE = 12;
-  static constexpr int OBSERVATION_SIZE = + 3 /* base link angular velocity */
-                                          + 3 /* projected gravity vector */
-                                          + 3 /* x, y, yaw velocity commands */
-                                          + ACTION_SIZE  /* joint positions */
-                                          + ACTION_SIZE  /* joint velocities */
-                                          + ACTION_SIZE; /* previous action */
+  static constexpr int SINGLE_OBSERVATION_SIZE = 3 /* base link angular velocity */
+                                                + 3 /* projected gravity vector */
+                                                + 3 /* x, y, yaw velocity commands */
+                                                + ACTION_SIZE  /* joint positions */
+                                                + ACTION_SIZE; /* previous action */
+  static constexpr int OBSERVATION_SIZE = OBSERVATION_HISTORY * SINGLE_OBSERVATION_SIZE;
   /* ----------------------------------------------- */
 
   std::shared_ptr<RTNeural::Model<float>> model_;

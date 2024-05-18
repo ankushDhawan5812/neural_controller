@@ -83,6 +83,11 @@ controller_interface::CallbackReturn NeuralController::on_activate(
   cmd_y_vel_ = 0.0;
   cmd_yaw_vel_ = 0.0;
 
+  // Set the gravity z-component in the initial observation vector
+  for (int i = 0; i < OBSERVATION_HISTORY; i++) {
+    observation_[i * SINGLE_OBSERVATION_SIZE + 5] = -1.0;
+  }
+
   // Initialize the command subscriber
   cmd_subscriber_ = get_node()->create_subscription<CmdType>(
       "/cmd_vel", rclcpp::SystemDefaultsQoS(),
@@ -236,15 +241,6 @@ controller_interface::return_type NeuralController::update(
                                params_.joint_pos_scale;
       }
     }
-    // Joint velocities
-    for (int i = 0; i < ACTION_SIZE; i++) {
-      observation_[9 + ACTION_SIZE + i] =
-          (float)state_interfaces_map_.at(params_.joint_names[i])
-              .at("velocity")
-              .get()
-              .get_value() *
-          params_.joint_vel_scale;
-    }
   } catch (const std::out_of_range &e) {
     RCLCPP_INFO(get_node()->get_logger(),
                 "failed to read joint states from hardware interface");
@@ -261,6 +257,11 @@ controller_interface::return_type NeuralController::update(
   // Perform policy inference
   model_->forward(observation_);
 
+  // Shift the observation history by SINGLE_OBSERVATION_SIZE for the next control step
+  for (int i = SINGLE_OBSERVATION_SIZE; i < OBSERVATION_SIZE; i++) {
+    observation_[i] = observation_[i - SINGLE_OBSERVATION_SIZE];
+  }
+
   // Process the actions
   const float *policy_output = model_->getOutputs();
   for (int i = 0; i < ACTION_SIZE; i++) {
@@ -269,7 +270,7 @@ controller_interface::return_type NeuralController::update(
         std::max(std::min(policy_output[i], (float)params_.action_limit),
                  (float)-params_.action_limit);
     // Copy policy_output to the observation vector
-    observation_[9 + ACTION_SIZE * 2 + i] =
+    observation_[9 + ACTION_SIZE + i] =
         fade_in_multiplier * action_clipped;
     // Scale and de-normalize to get the action vector
     if (params_.action_types[i] == "position") {
