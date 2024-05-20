@@ -66,10 +66,12 @@ class NeuralController : public controller_interface::ControllerInterface {
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;
 
-  float observation_[OBSERVATION_SIZE];
-  float action_[ACTION_SIZE];
+  float observation_[OBSERVATION_SIZE] = {0};
+  float action_[ACTION_SIZE] = {0};
 
-  float cmd_x_vel_, cmd_y_vel_, cmd_yaw_vel_;
+  float cmd_x_vel_ = 0;
+  float cmd_y_vel_ = 0;
+  float cmd_yaw_vel_ = 0;
 
   // Map from joint names to command types to command interfaces
   std::map<
@@ -89,7 +91,7 @@ class NeuralController : public controller_interface::ControllerInterface {
 
   int repeat_action_counter_;
 
-  double init_joint_pos_[ACTION_SIZE];
+  double init_joint_pos_[ACTION_SIZE] = {0};
 
   bool estop_active_ = false;
 };
