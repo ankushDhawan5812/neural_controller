@@ -41,6 +41,7 @@ ament_target_dependencies(
   rclcpp_lifecycle
   geometry_msgs
   tf2
+  std_msgs
 )
 
 pluginlib_export_plugin_description_file(controller_interface neural_controller.xml)
