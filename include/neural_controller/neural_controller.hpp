@@ -91,7 +91,7 @@ class NeuralController : public controller_interface::ControllerInterface {
 
   double init_joint_pos_[ACTION_SIZE];
 
-  bool estop_active_;
+  bool estop_active_ = false;
 };
 
 }  // namespace neural_controller
