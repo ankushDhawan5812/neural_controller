@@ -31,10 +31,12 @@ neural_controller:
     default_joint_pos:
       [0.26, 0.0, -0.52, -0.26, 0.0, 0.52, 0.26, 0.0, -0.52, -0.26, 0.0, 0.52]
     kps: [7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5]
-    kds: [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
+    kds:
+      [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
 
     init_kps: [7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5]
-    init_kds: [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
+    init_kds:
+      [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
 
     init_duration: 2.0
     fade_in_duration: 2.0
@@ -82,8 +84,9 @@ joy_node:
   ros__parameters:
     dev: "/dev/input/js0"
     autorepeat_rate: 50.0
+    coalesce_interval: 0.02
 
 joint_state_broadcaster:
   ros__parameters:
-    update_rate: 50
+    update_rate: 200
     use_local_topics: false
