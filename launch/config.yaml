@@ -88,5 +88,5 @@ joy_node:
 
 joint_state_broadcaster:
   ros__parameters:
-    update_rate: 200
+    update_rate: 250
     use_local_topics: false
