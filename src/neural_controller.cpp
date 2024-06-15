@@ -244,10 +244,6 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
   const float *policy_output_raw = model_->getOutputs();
   std::copy(policy_output_raw, policy_output_raw + ACTION_SIZE, policy_output.begin());
 
-  // remove after ensuring above code works
-  for (int i = 0; i < ACTION_SIZE; i++) {
-    assert(policy_output_raw[i] == policy_output.at(i));
-  }
   for (int i = 0; i < ACTION_SIZE; i++) {
     // Clip the action
     float action = fade_in_multiplier * policy_output.at(i) * params_.action_scales.at(i);
