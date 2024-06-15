@@ -246,7 +246,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
 
   // remove after ensuring above code works
   for (int i = 0; i < ACTION_SIZE; i++) {
-    assert(policy_output_raw.at(i) == policy_output.at(i));
+    assert(policy_output_raw[i] == policy_output.at(i));
   }
   std::cout << "\n\n";
   for (int i = 0; i < ACTION_SIZE; i++) {
