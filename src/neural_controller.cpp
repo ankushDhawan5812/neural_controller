@@ -248,12 +248,9 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
   for (int i = 0; i < ACTION_SIZE; i++) {
     assert(policy_output_raw[i] == policy_output.at(i));
   }
-  std::cout << "\n\n";
   for (int i = 0; i < ACTION_SIZE; i++) {
     // Clip the action
     float action = fade_in_multiplier * policy_output.at(i) * params_.action_scales.at(i);
-    std::cout << i << ": " << policy_output.at(i) << " "
-              << policy_output.at(i) * params_.action_scales.at(i) << "\n";
     if (params_.action_types.at(i) == "position") {
       action = action + params_.default_joint_pos.at(i);
     }
