@@ -95,7 +95,7 @@ neural_controller:
 
     max_body_angle: 3.14
 
-    model_path: "$(find-pkg-share neural_controller)/launch/policy_dandy-donkey-107_max_reward_31.66.json"
+    model_path: "$(find-pkg-share neural_controller)/launch/policy_treasured-tree-111_max_reward_30.75.json"
 
 teleop_twist_joy_node:
   ros__parameters:
