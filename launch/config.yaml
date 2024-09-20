@@ -8,6 +8,14 @@ controller_manager:
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
+    imu_sensor_broadcaster:
+      type: imu_sensor_broadcaster/IMUSensorBroadcaster
+
+imu_sensor_broadcaster:
+  ros__parameters:
+    frame_id: base_link
+    sensor_name: imu_sensor
+
 neural_controller:
   ros__parameters:
     repeat_action: 10
