@@ -93,6 +93,11 @@ controller_interface::CallbackReturn NeuralController::on_activate(
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
+controller_interface::CallbackReturn NeuralController::on_error(
+    const rclcpp_lifecycle::State & /*previous_state*/) {
+  return controller_interface::CallbackReturn::FAILURE;
+}
+
 controller_interface::CallbackReturn NeuralController::on_deactivate(
     const rclcpp_lifecycle::State & /*previous_state*/) {
   rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
@@ -231,8 +236,14 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
                                (float)-params_.observation_limit);
   }
 
+  // Check observation for NaNs
+  if (contains_nan(observation_)) {
+    RCLCPP_ERROR(get_node()->get_logger(), "observation_ contains NaN");
+    return controller_interface::return_type::ERROR;
+  }
+
   // Perform policy inference
-  model_->forward(observation_);
+  model_->forward(observation_.data());
 
   // Shift the observation history by SINGLE_OBSERVATION_SIZE for the next control step
   for (int i = SINGLE_OBSERVATION_SIZE; i < OBSERVATION_SIZE; i++) {
@@ -254,6 +265,12 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     } else {
       action_[i] = fade_in_multiplier * action_clipped * params_.action_scales[i];
     }
+
+    if (std::isnan(action_[i])) {
+      RCLCPP_ERROR(get_node()->get_logger(), "action_[%d] is NaN", i);
+      return controller_interface::return_type::ERROR;
+    }
+
     // Send the action to the hardware interface
     command_interfaces_map_.at(params_.joint_names[i])
         .at(params_.action_types[i])

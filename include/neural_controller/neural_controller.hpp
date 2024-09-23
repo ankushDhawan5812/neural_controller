@@ -1,5 +1,4 @@
-#ifndef NEURAL_CONTROLLER__NEURAL_CONTROLLER_HPP_
-#define NEURAL_CONTROLLER__NEURAL_CONTROLLER_HPP_
+#pragma once
 
 #include <RTNeural/RTNeural.h>
 
@@ -23,6 +22,13 @@
 #include "neural_controller_parameters.hpp"
 
 namespace neural_controller {
+
+template <typename T>
+bool contains_nan(const T &container) {
+  return std::any_of(container.begin(), container.end(),
+                     [](double val) { return std::isnan(val); });
+}
+
 using CmdType = geometry_msgs::msg::Twist;
 
 class NeuralController : public controller_interface::ControllerInterface {
@@ -46,6 +52,9 @@ class NeuralController : public controller_interface::ControllerInterface {
   controller_interface::CallbackReturn on_deactivate(
       const rclcpp_lifecycle::State &previous_state) override;
 
+  controller_interface::CallbackReturn on_error(
+      const rclcpp_lifecycle::State &previous_state) override;
+
   controller_interface::return_type update(const rclcpp::Time &time,
                                            const rclcpp::Duration &period) override;
 
@@ -66,8 +75,8 @@ class NeuralController : public controller_interface::ControllerInterface {
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;
 
-  float observation_[OBSERVATION_SIZE] = {0};
-  float action_[ACTION_SIZE] = {0};
+  std::array<float, OBSERVATION_SIZE> observation_ = {};
+  std::array<float, ACTION_SIZE> action_ = {};
 
   float cmd_x_vel_ = 0;
   float cmd_y_vel_ = 0;
@@ -91,11 +100,9 @@ class NeuralController : public controller_interface::ControllerInterface {
 
   int repeat_action_counter_;
 
-  double init_joint_pos_[ACTION_SIZE] = {0};
+  std::array<double, ACTION_SIZE> init_joint_pos_ = {};
 
   bool estop_active_ = false;
 };
 
 }  // namespace neural_controller
-
-#endif  // NEURAL_CONTROLLER__NEURAL_CONTROLLER_HPP_
