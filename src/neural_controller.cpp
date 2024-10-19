@@ -98,14 +98,17 @@ controller_interface::CallbackReturn NeuralController::on_init() {
 
     if (j.find("observation_history") != j.end()) {
       params_.observation_history = j["observation_history"];
-      if (j["in_shape"].at(1) != params_.observation_history * SINGLE_OBSERVATION_SIZE) {
-        RCLCPP_ERROR(get_node()->get_logger(),
-                     "observation_history (%d) * SINGLE_OBSERVATION_SIZE (%d) != in_shape (%d)",
-                     params_.observation_history, SINGLE_OBSERVATION_SIZE,
-                     static_cast<int>(j["in_shape"].at(1)));
-        return controller_interface::CallbackReturn::ERROR;
-      }
     }
+
+    // Check that the observation history is consistent with the model input shape
+    if (j["in_shape"].at(1) != params_.observation_history * SINGLE_OBSERVATION_SIZE) {
+      RCLCPP_ERROR(get_node()->get_logger(),
+                   "observation_history (%d) * SINGLE_OBSERVATION_SIZE (%d) != in_shape (%d)",
+                   params_.observation_history, SINGLE_OBSERVATION_SIZE,
+                   static_cast<int>(j["in_shape"].at(1)));
+      return controller_interface::CallbackReturn::ERROR;
+    }
+
   } catch (const std::exception &e) {
     fprintf(stderr, "Exception thrown during init stage with message: %s \n", e.what());
     return controller_interface::CallbackReturn::ERROR;
@@ -282,7 +285,16 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
                      "use_imu is false but IMU orientation is not identity");
         return controller_interface::return_type::ERROR;
       }
+    } else {
+      // Check that the orientation is not identity if we are using the IMU
+      if (std::abs(orientation_w - 1.0) < 1e-6 && std::abs(orientation_x) < 1e-6 &&
+          std::abs(orientation_y) < 1e-6 && std::abs(orientation_z) < 1e-6) {
+        RCLCPP_WARN(get_node()->get_logger(),
+                    "use_imu is true but IMU orientation is near identity");
+      }
     }
+
+    // RCLCPP_INFO(get_node()->get_logger(), "ang_vel: %f %f %f", ang_vel_x, ang_vel_y, ang_vel_z);
 
     // Calculate the projected gravity vector
     tf2::Quaternion q(orientation_x, orientation_y, orientation_z, orientation_w);
