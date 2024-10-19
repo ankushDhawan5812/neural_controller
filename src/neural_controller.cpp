@@ -352,10 +352,10 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
   // Perform policy inference
   model_->forward(observation_.data());
 
-  // Shift the observation history by SINGLE_OBSERVATION_SIZE for the next control step
-  for (int i = SINGLE_OBSERVATION_SIZE; i < observation_.size(); i++) {
-    observation_.at(i) = observation_.at(i - SINGLE_OBSERVATION_SIZE);
-  }
+  // Shift the observation history to the right by SINGLE_OBSERVATION_SIZE for the next control step
+  // https://en.cppreference.com/w/cpp/algorithm/rotate
+  std::rotate(observation_.rbegin(), observation_.rbegin() + SINGLE_OBSERVATION_SIZE,
+              observation_.rend());
 
   // Process the actions
   const float *policy_output = model_->getOutputs();
