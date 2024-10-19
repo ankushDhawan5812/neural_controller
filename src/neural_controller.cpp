@@ -17,10 +17,38 @@ NeuralController::NeuralController()
       rt_command_ptr_(nullptr),
       cmd_subscriber_(nullptr) {}
 
+// Check parameter vectors have the correct size
+bool NeuralController::check_param_vector_size() {
+  const std::vector<std::pair<std::string, size_t>> param_sizes = {
+      {"action_scales", params_.action_scales.size()},
+      {"action_types", params_.action_types.size()},
+      {"kps", params_.kps.size()},
+      {"kds", params_.kds.size()},
+      {"init_kps", params_.init_kps.size()},
+      {"init_kds", params_.init_kds.size()},
+      {"default_joint_pos", params_.default_joint_pos.size()},
+      {"joint_lower_limits", params_.joint_lower_limits.size()},
+      {"joint_upper_limits", params_.joint_upper_limits.size()},
+      {"joint_names", params_.joint_names.size()}};
+
+  for (const auto &[name, size] : param_sizes) {
+    if (size != ACTION_SIZE) {
+      RCLCPP_ERROR(get_node()->get_logger(), "%s size is %d, expected %d", name.c_str(), size,
+                   ACTION_SIZE);
+      return false;
+    }
+  }
+  return true;
+}
+
 controller_interface::CallbackReturn NeuralController::on_init() {
   try {
     param_listener_ = std::make_shared<ParamListener>(get_node());
     params_ = param_listener_->get_params();
+
+    if (!check_param_vector_size()) {
+      return controller_interface::CallbackReturn::ERROR;
+    }
 
     std::ifstream json_stream(params_.model_path, std::ifstream::binary);
     model_ = RTNeural::json_parser::parseJson<float>(json_stream, true);
@@ -30,60 +58,54 @@ controller_interface::CallbackReturn NeuralController::on_init() {
     std::ifstream json_file(params_.model_path);
     json_file >> j;
 
+    auto set_param_from_json_vector = [&](const std::string &key, auto &param) {
+      if (j.find(key) != j.end()) {
+        if (j[key].size() != ACTION_SIZE) {
+          std::string error_msg = "Invalid size for " + key + " (" + std::to_string(j[key].size()) +
+                                  ") != " + std::to_string(ACTION_SIZE);
+          RCLCPP_ERROR(get_node()->get_logger(), "%s", error_msg.c_str());
+          throw std::runtime_error(error_msg);
+        }
+        for (int i = 0; i < param.size(); i++) {
+          param.at(i) = j[key].at(i);
+        }
+      }
+    };
+
+    auto set_param_from_json_scalar = [&](const std::string &key, auto &param) {
+      if (j.find(key) != j.end()) {
+        for (auto &p : param) {
+          p = j[key];
+        }
+      }
+    };
+
+    set_param_from_json_scalar("action_scale", params_.action_scales);
+    set_param_from_json_scalar("kp", params_.kps);
+    set_param_from_json_scalar("kd", params_.kds);
+    set_param_from_json_vector("default_pose", params_.default_joint_pos);
+    set_param_from_json_vector("joint_lower_limits", params_.joint_lower_limits);
+    set_param_from_json_vector("joint_upper_limits", params_.joint_upper_limits);
+
     // Warn user that use_imu should be set in the robot description
     if (j.find("use_imu") != j.end()) {
-      RCLCPP_WARN(
-          get_node()->get_logger(),
-          "Policy specifies use_imu. Verify robot description has set proper value of use_imu");
+      RCLCPP_WARN(get_node()->get_logger(),
+                  "Policy JSON specifies use_imu=%d. Verify robot description has proper value of "
+                  "use_imu",
+                  j["use_imu"]);
+      params_.use_imu = j["use_imu"];
     }
 
-    // Set action_scale
-    if (j.find("action_scale") != j.end()) {
-      for (auto &action_scale : params_.action_scales) {
-        action_scale = j["action_scale"];
-      }
-    }
-
-    // TODO: make kp a vector parameter rather than a single parameter
-    if (j.find("kp") != j.end()) {
-      for (auto &kp : params_.kps) {
-        kp = j["kp"];
-      }
-    }
-
-    // TODO: make kd a vector parameter rather than a single parameter
-    if (j.find("kd") != j.end()) {
-      for (auto &kd : params_.kds) {
-        kd = j["kd"];
-      }
-    }
-
-    // Set default_joint_pos
-    if (j.find("default_pose") != j.end()) {
-      for (int i = 0; i < params_.default_joint_pos.size(); i++) {
-        params_.default_joint_pos.at(i) = j["default_pose"].at(i);
-      }
-    }
-
-    // Set lower limits for actions
-    if (j.find("joint_lower_limits") != j.end()) {
-      for (int i = 0; i < params_.joint_lower_limits.size(); i++) {
-        params_.joint_lower_limits.at(i) = j["joint_lower_limits"].at(i);
-      }
-    }
-
-    // Set upper limits for actions
-    if (j.find("joint_upper_limits") != j.end()) {
-      for (int i = 0; i < params_.joint_upper_limits.size(); i++) {
-        params_.joint_upper_limits.at(i) = j["joint_upper_limits"].at(i);
-      }
-    }
-
-    // Set observation history
     if (j.find("observation_history") != j.end()) {
       params_.observation_history = j["observation_history"];
+      if (j["in_shape"].at(1) != params_.observation_history * SINGLE_OBSERVATION_SIZE) {
+        RCLCPP_ERROR(get_node()->get_logger(),
+                     "observation_history (%d) * SINGLE_OBSERVATION_SIZE (%d) != in_shape (%d)",
+                     params_.observation_history, SINGLE_OBSERVATION_SIZE,
+                     static_cast<int>(j["in_shape"].at(1)));
+        return controller_interface::CallbackReturn::ERROR;
+      }
     }
-
   } catch (const std::exception &e) {
     fprintf(stderr, "Exception thrown during init stage with message: %s \n", e.what());
     return controller_interface::CallbackReturn::ERROR;

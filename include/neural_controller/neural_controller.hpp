@@ -59,6 +59,8 @@ class NeuralController : public controller_interface::ControllerInterface {
                                            const rclcpp::Duration &period) override;
 
  protected:
+  bool check_param_vector_size();
+  
   /* ----------------- Layer sizes ----------------- */
   // TODO: Could make observation a struct with named fields
   static constexpr int ACTION_SIZE = 12;
