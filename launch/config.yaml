@@ -19,6 +19,8 @@ imu_sensor_broadcaster:
 neural_controller:
   ros__parameters:
     repeat_action: 10
+    observation_history: 2
+    use_imu: true
 
     joint_names:
       [
