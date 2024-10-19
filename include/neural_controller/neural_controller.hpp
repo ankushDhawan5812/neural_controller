@@ -60,14 +60,16 @@ class NeuralController : public controller_interface::ControllerInterface {
 
  protected:
   /* ----------------- Layer sizes ----------------- */
-  static constexpr int OBSERVATION_HISTORY = 2;
+  // TODO: Could make observation a struct with named fields
   static constexpr int ACTION_SIZE = 12;
+  static constexpr int JOINT_POSITION_IDX = 9;
+  static constexpr int LAST_ACTION_IDX = JOINT_POSITION_IDX + ACTION_SIZE;
   static constexpr int SINGLE_OBSERVATION_SIZE = 3              /* base link angular velocity */
                                                  + 3            /* projected gravity vector */
                                                  + 3            /* x, y, yaw velocity commands */
                                                  + ACTION_SIZE  /* joint positions */
                                                  + ACTION_SIZE; /* previous action */
-  static constexpr int OBSERVATION_SIZE = OBSERVATION_HISTORY * SINGLE_OBSERVATION_SIZE;
+  // Total observation size is determined at runtime by the observation history parameter
   /* ----------------------------------------------- */
 
   std::shared_ptr<RTNeural::Model<float>> model_;
@@ -75,7 +77,7 @@ class NeuralController : public controller_interface::ControllerInterface {
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;
 
-  std::array<float, OBSERVATION_SIZE> observation_ = {};
+  std::vector<float> observation_ = {};
   std::array<float, ACTION_SIZE> action_ = {};
 
   float cmd_x_vel_ = 0;
