@@ -32,9 +32,9 @@ bool NeuralController::check_param_vector_size() {
       {"joint_names", params_.joint_names.size()}};
 
   for (const auto &[name, size] : param_sizes) {
-    if (size != ACTION_SIZE) {
+    if (size != kActionSize) {
       RCLCPP_ERROR(get_node()->get_logger(), "%s size is %d, expected %d", name.c_str(), size,
-                   ACTION_SIZE);
+                   kActionSize);
       return false;
     }
   }
@@ -60,9 +60,10 @@ controller_interface::CallbackReturn NeuralController::on_init() {
 
     auto set_param_from_json_vector = [&](const std::string &key, auto &param) {
       if (j.find(key) != j.end()) {
-        if (j[key].size() != ACTION_SIZE) {
+        RCLCPP_INFO(get_node()->get_logger(), "Setting %s from JSON", key.c_str());
+        if (j[key].size() != kActionSize) {
           std::string error_msg = "Invalid size for " + key + " (" + std::to_string(j[key].size()) +
-                                  ") != " + std::to_string(ACTION_SIZE);
+                                  ") != " + std::to_string(kActionSize);
           RCLCPP_ERROR(get_node()->get_logger(), "%s", error_msg.c_str());
           throw std::runtime_error(error_msg);
         }
@@ -74,6 +75,8 @@ controller_interface::CallbackReturn NeuralController::on_init() {
 
     auto set_param_from_json_scalar = [&](const std::string &key, auto &param) {
       if (j.find(key) != j.end()) {
+        RCLCPP_INFO(get_node()->get_logger(), "Setting %s=%f from JSON", key.c_str(),
+                    static_cast<double>(j[key]));
         for (auto &p : param) {
           p = j[key];
         }
@@ -97,14 +100,15 @@ controller_interface::CallbackReturn NeuralController::on_init() {
     }
 
     if (j.find("observation_history") != j.end()) {
+      RCLCPP_INFO(get_node()->get_logger(), "Setting observation_history from JSON");
       params_.observation_history = j["observation_history"];
     }
 
     // Check that the observation history is consistent with the model input shape
-    if (j["in_shape"].at(1) != params_.observation_history * SINGLE_OBSERVATION_SIZE) {
+    if (j["in_shape"].at(1) != params_.observation_history * kSingleObservationSize) {
       RCLCPP_ERROR(get_node()->get_logger(),
-                   "observation_history (%d) * SINGLE_OBSERVATION_SIZE (%d) != in_shape (%d)",
-                   params_.observation_history, SINGLE_OBSERVATION_SIZE,
+                   "observation_history (%d) * kSingleObservationSize (%d) != in_shape (%d)",
+                   params_.observation_history, kSingleObservationSize,
                    static_cast<int>(j["in_shape"].at(1)));
       return controller_interface::CallbackReturn::ERROR;
     }
@@ -152,7 +156,7 @@ controller_interface::CallbackReturn NeuralController::on_activate(
   }
 
   // Store the initial joint positions
-  for (int i = 0; i < ACTION_SIZE; i++) {
+  for (int i = 0; i < kActionSize; i++) {
     init_joint_pos_.at(i) =
         state_interfaces_map_.at(params_.joint_names.at(i)).at("position").get().get_value();
   }
@@ -165,11 +169,11 @@ controller_interface::CallbackReturn NeuralController::on_activate(
   cmd_yaw_vel_ = 0.0;
 
   // Initialize the observation vector
-  observation_.resize(params_.observation_history * SINGLE_OBSERVATION_SIZE, 0.0);
+  observation_.resize(params_.observation_history * kSingleObservationSize, 0.0);
 
   // Set the gravity z-component in the initial observation vector
   for (int i = 0; i < params_.observation_history; i++) {
-    observation_.at(i * SINGLE_OBSERVATION_SIZE + 5) = -1.0;
+    observation_.at(i * kSingleObservationSize + kGravityZIndx) = -1.0;
   }
 
   // Initialize the command subscriber
@@ -201,7 +205,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
   // When started, return to the default joint positions
   double time_since_init = (time - init_time_).seconds();
   if (time_since_init < params_.init_duration) {
-    for (int i = 0; i < ACTION_SIZE; i++) {
+    for (int i = 0; i < kActionSize; i++) {
       // Interpolate between the initial joint positions and the default joint
       // positions
       double interpolated_joint_pos =
@@ -323,13 +327,13 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     observation_.at(7) = (float)cmd_y_vel_;
     observation_.at(8) = (float)cmd_yaw_vel_;
     // Joint positions
-    for (int i = 0; i < ACTION_SIZE; i++) {
+    for (int i = 0; i < kActionSize; i++) {
       // Only include the joint position in the observation if the action type
       // is position
       if (params_.action_types.at(i) == "position") {
         float joint_pos =
             state_interfaces_map_.at(params_.joint_names.at(i)).at("position").get().get_value();
-        observation_.at(JOINT_POSITION_IDX + i) = joint_pos - params_.default_joint_pos.at(i);
+        observation_.at(kJointPositionIdx + i) = joint_pos - params_.default_joint_pos.at(i);
       }
     }
   } catch (const std::out_of_range &e) {
@@ -352,14 +356,14 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
   // Perform policy inference
   model_->forward(observation_.data());
 
-  // Shift the observation history to the right by SINGLE_OBSERVATION_SIZE for the next control step
+  // Shift the observation history to the right by kSingleObservationSize for the next control step
   // https://en.cppreference.com/w/cpp/algorithm/rotate
-  std::rotate(observation_.rbegin(), observation_.rbegin() + SINGLE_OBSERVATION_SIZE,
+  std::rotate(observation_.rbegin(), observation_.rbegin() + kSingleObservationSize,
               observation_.rend());
 
   // Process the actions
   const float *policy_output = model_->getOutputs();
-  for (int i = 0; i < ACTION_SIZE; i++) {
+  for (int i = 0; i < kActionSize; i++) {
     float action = policy_output[i];
     float action_scale = params_.action_scales.at(i);
     float default_joint_pos = params_.default_joint_pos.at(i);
@@ -367,7 +371,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     float upper_limit = params_.joint_upper_limits.at(i);
 
     // Copy policy_output to the observation vector
-    observation_.at(LAST_ACTION_IDX + i) = fade_in_multiplier * action;
+    observation_.at(kLastActionIdx + i) = fade_in_multiplier * action;
     // Scale and de-normalize to get the action vector
     if (params_.action_types.at(i) == "position") {
       float unclipped = fade_in_multiplier * action * action_scale + default_joint_pos;

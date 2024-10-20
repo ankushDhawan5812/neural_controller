@@ -60,18 +60,18 @@ class NeuralController : public controller_interface::ControllerInterface {
 
  protected:
   bool check_param_vector_size();
-  
+
   /* ----------------- Layer sizes ----------------- */
   // TODO: Could make observation a struct with named fields
-  static constexpr int ACTION_SIZE = 12;
-  static constexpr int JOINT_POSITION_IDX = 9;
-  static constexpr int LAST_ACTION_IDX = JOINT_POSITION_IDX + ACTION_SIZE;
-  static constexpr int SINGLE_OBSERVATION_SIZE = 3              /* base link angular velocity */
-                                                 + 3            /* projected gravity vector */
-                                                 + 3            /* x, y, yaw velocity commands */
-                                                 + ACTION_SIZE  /* joint positions */
-                                                 + ACTION_SIZE; /* previous action */
-  // Total observation size is determined at runtime by the observation history parameter
+  static constexpr int kActionSize = 12;
+  static constexpr int kJointPositionIdx = 9;
+  static constexpr int kLastActionIdx = kJointPositionIdx + kActionSize;
+  static constexpr int kSingleObservationSize = 3              /* base link angular velocity */
+                                                + 3            /* projected gravity vector */
+                                                + 3            /* x, y, yaw velocity commands */
+                                                + kActionSize  /* joint positions */
+                                                + kActionSize; /* previous action */
+  static constexpr int kGravityZIndx = 5;  // Index of gravity z component in the observation
   /* ----------------------------------------------- */
 
   std::shared_ptr<RTNeural::Model<float>> model_;
@@ -79,9 +79,16 @@ class NeuralController : public controller_interface::ControllerInterface {
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;
 
+  // Observation vector. Size is determined at runtime by the observation history parameter
   std::vector<float> observation_ = {};
-  std::array<float, ACTION_SIZE> action_ = {};
 
+  // Action vector
+  std::array<float, kActionSize> action_ = {};
+
+  // Initial joint positions
+  std::array<double, kActionSize> init_joint_pos_ = {};
+
+  // Command velocities
   float cmd_x_vel_ = 0;
   float cmd_y_vel_ = 0;
   float cmd_yaw_vel_ = 0;
@@ -103,8 +110,6 @@ class NeuralController : public controller_interface::ControllerInterface {
   rclcpp::Time init_time_;
 
   int repeat_action_counter_;
-
-  std::array<double, ACTION_SIZE> init_joint_pos_ = {};
 
   bool estop_active_ = false;
 };

@@ -59,7 +59,7 @@ def generate_launch_description():
         executable="ros2_control_node",
         parameters=[robot_controllers],
         output="both",
-        prefix="xterm -e gdb -ex run --args",
+        # prefix="xterm -e gdb -ex run --args",
     )
 
     robot_controller_spawner = Node(
