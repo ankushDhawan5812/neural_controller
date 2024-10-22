@@ -15,7 +15,9 @@ namespace neural_controller {
 NeuralController::NeuralController()
     : controller_interface::ControllerInterface(),
       rt_command_ptr_(nullptr),
-      cmd_subscriber_(nullptr) {}
+      rt_joy_command_ptr_(nullptr),
+      cmd_subscriber_(nullptr),
+      joy_subscriber_(nullptr) {}
 
 // Check parameter vectors have the correct size
 bool NeuralController::check_param_vector_size() {
@@ -142,6 +144,7 @@ controller_interface::InterfaceConfiguration NeuralController::state_interface_c
 controller_interface::CallbackReturn NeuralController::on_activate(
     const rclcpp_lifecycle::State & /*previous_state*/) {
   rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
+  rt_joy_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<Joy>>(nullptr);
 
   // Populate the command interfaces map
   for (auto &command_interface : command_interfaces_) {
@@ -181,6 +184,10 @@ controller_interface::CallbackReturn NeuralController::on_activate(
       "/cmd_vel", rclcpp::SystemDefaultsQoS(),
       [this](const CmdType::SharedPtr msg) { rt_command_ptr_.writeFromNonRT(msg); });
 
+  joy_subscriber_ = get_node()->create_subscription<Joy>(
+      "/joy", rclcpp::SystemDefaultsQoS(),
+      [this](const Joy::SharedPtr msg) { rt_joy_command_ptr_.writeFromNonRT(msg); });
+
   RCLCPP_INFO(get_node()->get_logger(), "activate successful");
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -193,6 +200,7 @@ controller_interface::CallbackReturn NeuralController::on_error(
 controller_interface::CallbackReturn NeuralController::on_deactivate(
     const rclcpp_lifecycle::State & /*previous_state*/) {
   rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
+  rt_joy_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<Joy>>(nullptr);
   for (auto &command_interface : command_interfaces_) {
     command_interface.set_value(0.0);
   }
@@ -231,14 +239,6 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
   double time_since_fade_in = (time - init_time_).seconds() - params_.init_duration;
   float fade_in_multiplier = std::min(time_since_fade_in / params_.fade_in_duration, 1.0);
 
-  // If an emergency stop has been triggered, set all commands to 0 and return
-  if (estop_active_) {
-    for (auto &command_interface : command_interfaces_) {
-      command_interface.set_value(0.0);
-    }
-    return controller_interface::return_type::OK;
-  }
-
   // Only get a new action from the policy when repeat_action_counter_ is 0
   repeat_action_counter_ += 1;
   repeat_action_counter_ %= params_.repeat_action;
@@ -252,6 +252,52 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     cmd_x_vel_ = command->get()->linear.x;
     cmd_y_vel_ = command->get()->linear.y;
     cmd_yaw_vel_ = command->get()->angular.z;
+  }
+
+  auto joy_command = rt_joy_command_ptr_.readFromRT();
+  if (joy_command && joy_command->get()) {
+    // Estop if any estop button pressed
+    // Use params_.estop_button_indices vector
+    for (auto idx : params_.estop_button_indices) {
+      if (joy_command->get()->buttons.at(idx) == 1) {
+        estop_active_ = true;
+        RCLCPP_INFO(get_node()->get_logger(), "Emergency stop triggered");
+      }
+    }
+    // Release estop if the release button is pressed
+    if (joy_command->get()->buttons.at(params_.estop_release_button_idx) == 1) {
+      estop_active_ = false;
+      RCLCPP_INFO(get_node()->get_logger(), "Emergency stop released");
+    }
+
+    // Set pitch command based on right stick y-axis
+    float cmd_pitch_deg =
+        joy_command->get()->axes.at(params_.pitch_axis_idx) * params_.max_pitch_deg;
+
+    // Set roll command based on right stick x-axis
+    float cmd_roll_deg = joy_command->get()->axes.at(params_.roll_axis_idx) * params_.max_roll_deg;
+
+    // Set desired_world_z_in_body_frame_ based on pitch and roll commands
+    desired_world_z_in_body_frame_ = tf2::Vector3(0, 0, 1);
+    desired_world_z_in_body_frame_ =
+        tf2::quatRotate(tf2::Quaternion(tf2::Vector3(0, 1, 0), cmd_pitch_deg * M_PI / 180.0),
+                        desired_world_z_in_body_frame_);
+    desired_world_z_in_body_frame_ =
+        tf2::quatRotate(tf2::Quaternion(tf2::Vector3(1, 0, 0), cmd_roll_deg * M_PI / 180.0),
+                        desired_world_z_in_body_frame_);
+
+    RCLCPP_INFO(get_node()->get_logger(),
+                "cmd_pitch_deg: %f, cmd_roll_deg: %f desired_world_z_in_body_frame: %f %f %f",
+                cmd_pitch_deg, cmd_roll_deg, desired_world_z_in_body_frame_.getX(),
+                desired_world_z_in_body_frame_.getY(), desired_world_z_in_body_frame_.getZ());
+  }
+
+  // If an emergency stop has been triggered, set all commands to 0 and return
+  if (estop_active_) {
+    for (auto &command_interface : command_interfaces_) {
+      command_interface.set_value(0.0);
+    }
+    return controller_interface::return_type::OK;
   }
 
   // Get the latest observation
@@ -322,10 +368,15 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     observation_.at(3) = (float)projected_gravity_vector[0];
     observation_.at(4) = (float)projected_gravity_vector[1];
     observation_.at(5) = (float)projected_gravity_vector[2];
-    // Commands
+    // Velocity commands
     observation_.at(6) = (float)cmd_x_vel_;
     observation_.at(7) = (float)cmd_y_vel_;
     observation_.at(8) = (float)cmd_yaw_vel_;
+    // Orientation commands
+    observation_.at(9) = (float)desired_world_z_in_body_frame_.getX();
+    observation_.at(10) = (float)desired_world_z_in_body_frame_.getY();
+    observation_.at(11) = (float)desired_world_z_in_body_frame_.getZ();
+
     // Joint positions
     for (int i = 0; i < kActionSize; i++) {
       // Only include the joint position in the observation if the action type

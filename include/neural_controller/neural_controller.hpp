@@ -15,6 +15,7 @@
 #include "rclcpp_lifecycle/state.hpp"
 #include "realtime_tools/realtime_buffer.h"
 #include "realtime_tools/realtime_publisher.h"
+#include "sensor_msgs/msg/joy.hpp"
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Quaternion.h"
 
@@ -30,6 +31,7 @@ bool contains_nan(const T &container) {
 }
 
 using CmdType = geometry_msgs::msg::Twist;
+using Joy = sensor_msgs::msg::Joy;
 
 class NeuralController : public controller_interface::ControllerInterface {
  public:
@@ -64,11 +66,12 @@ class NeuralController : public controller_interface::ControllerInterface {
   /* ----------------- Layer sizes ----------------- */
   // TODO: Could make observation a struct with named fields
   static constexpr int kActionSize = 12;
-  static constexpr int kJointPositionIdx = 9;
+  static constexpr int kJointPositionIdx = 12;
   static constexpr int kLastActionIdx = kJointPositionIdx + kActionSize;
   static constexpr int kSingleObservationSize = 3              /* base link angular velocity */
                                                 + 3            /* projected gravity vector */
                                                 + 3            /* x, y, yaw velocity commands */
+                                                + 3            /* desired world z in body frame */
                                                 + kActionSize  /* joint positions */
                                                 + kActionSize; /* previous action */
   static constexpr int kGravityZIndx = 5;  // Index of gravity z component in the observation
@@ -93,6 +96,9 @@ class NeuralController : public controller_interface::ControllerInterface {
   float cmd_y_vel_ = 0;
   float cmd_yaw_vel_ = 0;
 
+  // Command body orientation
+  tf2::Vector3 desired_world_z_in_body_frame_ = tf2::Vector3(0, 0, 1);
+
   // Map from joint names to command types to command interfaces
   std::map<
       std::string,
@@ -106,6 +112,9 @@ class NeuralController : public controller_interface::ControllerInterface {
 
   realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>> rt_command_ptr_;
   rclcpp::Subscription<CmdType>::SharedPtr cmd_subscriber_;
+
+  realtime_tools::RealtimeBuffer<std::shared_ptr<Joy>> rt_joy_command_ptr_;
+  rclcpp::Subscription<Joy>::SharedPtr joy_subscriber_;
 
   rclcpp::Time init_time_;
 
