@@ -1,10 +1,16 @@
-import wandb
+import argparse
 import pathlib
 import shutil
 
+import wandb
+
 
 def download_latest_model(
-    project_name, entity_name, model_dir="launch", model_name="policy_latest.json"
+    project_name,
+    entity_name,
+    run_number: int,
+    model_dir="launch",
+    model_name="policy_latest.json",
 ):
     """
     Downloads the latest model from a W&B project.
@@ -27,16 +33,24 @@ def download_latest_model(
         print("No runs found in the project.")
         return
 
-    # Get the latest run (assuming runs are sorted by start time by default)
-    # sort runs by the number at the end of the name
-    runs = sorted(runs, key=lambda run: int(run.name.split("-")[-1]))
-    latest_run = runs[-1]
-
-    print(f"Latest run: {latest_run.name}")
+    # find the run whose names ends in -run_number
+    if run_number is not None:
+        runs = [run for run in runs if run.name.endswith(f"-{run_number}")]
+        if not runs:
+            print(f"No runs found with the number {run_number}.")
+            return
+        run = runs[0]
+        print("Using run: ", run.name)
+    else:
+        # Get the latest run (assuming runs are sorted by start time by default)
+        # sort runs by the number at the end of the name
+        runs = sorted(runs, key=lambda run: int(run.name.split("-")[-1]))
+        run = runs[-1]
+        print(f"Latest run: {run.name}")
 
     # get the artifact with the name that contains .json
-    art = [art for art in latest_run.logged_artifacts() if ".json" in art.name][0]
-    print("Using: ", art.name)
+    art = [art for art in run.logged_artifacts() if ".json" in art.name][0]
+    print("Using artifact: ", art.name)
 
     # remove the :[version] from the name
     base_name = art.name.split(":")[0]
@@ -62,7 +76,17 @@ if __name__ == "__main__":
     project_name = "pupperv3-mjx-rl"
     entity_name = "hands-on-robotics"
 
+    # declare argparse arg for model number
+    argparser = argparse.ArgumentParser()
+    # model number
+    argparser.add_argument("--run_number", type=int, default=None)
+    args = argparser.parse_args()
+
     # Call the function to download the latest model
     download_latest_model(
-        project_name, entity_name, model_dir="launch", model_name="policy_latest.json"
+        project_name,
+        entity_name,
+        args.run_number,
+        model_dir="launch",
+        model_name="policy_latest.json",
     )
