@@ -36,10 +36,15 @@ Build
 
 
 ### Use latest model from WandB
+* `pip install wandb`
 * `python3 download_latest_policy.py`
-* Or specific run number: `python3 download_latest_policy.py --run_number=155`
-* Build again
-
+   * Or specific run number: `python3 download_latest_policy.py --run_number=155`
+   * The script will ask you to provide your WandB API key
+   * The script is hardcoded to use models from the `hands-on-robotics/pupperv3-mjx-rl` project so change if necessary.
+* This will download the policy .json file to launch folder as `policy_latest.json`
+* Set `model_path` in your `launch/config.yaml` as `model_path: "$(find-pkg-share neural_controller)/launch/policy_latest.json"`
+* Build 
+* Run using command above
 
 # Functionality
 ## Inputs
