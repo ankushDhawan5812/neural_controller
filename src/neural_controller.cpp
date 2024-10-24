@@ -15,9 +15,7 @@ namespace neural_controller {
 NeuralController::NeuralController()
     : controller_interface::ControllerInterface(),
       rt_command_ptr_(nullptr),
-      rt_joy_command_ptr_(nullptr),
-      cmd_subscriber_(nullptr),
-      joy_subscriber_(nullptr) {}
+      rt_joy_command_ptr_(nullptr) {}
 
 // Check parameter vectors have the correct size
 bool NeuralController::check_param_vector_size() {
@@ -35,7 +33,7 @@ bool NeuralController::check_param_vector_size() {
 
   for (const auto &[name, size] : param_sizes) {
     if (size != kActionSize) {
-      RCLCPP_ERROR(get_node()->get_logger(), "%s size is %d, expected %d", name.c_str(), size,
+      RCLCPP_ERROR(get_node()->get_logger(), "%s size is %ld, expected %d", name.c_str(), size,
                    kActionSize);
       return false;
     }
@@ -62,7 +60,8 @@ controller_interface::CallbackReturn NeuralController::on_init() {
 
     auto set_param_from_json_vector = [&](const std::string &key, auto &param) {
       if (j.find(key) != j.end()) {
-        RCLCPP_INFO(get_node()->get_logger(), "Setting %s from JSON", key.c_str());
+        RCLCPP_INFO(get_node()->get_logger(), "From JSON, setting %s vector element-by-element",
+                    key.c_str());
         if (j[key].size() != kActionSize) {
           std::string error_msg = "Invalid size for " + key + " (" + std::to_string(j[key].size()) +
                                   ") != " + std::to_string(kActionSize);
@@ -77,7 +76,7 @@ controller_interface::CallbackReturn NeuralController::on_init() {
 
     auto set_param_from_json_scalar = [&](const std::string &key, auto &param) {
       if (j.find(key) != j.end()) {
-        RCLCPP_INFO(get_node()->get_logger(), "Setting %s=%f from JSON", key.c_str(),
+        RCLCPP_INFO(get_node()->get_logger(), "From JSON, setting %s[:]=%f", key.c_str(),
                     static_cast<double>(j[key]));
         for (auto &p : param) {
           p = j[key];
@@ -94,22 +93,23 @@ controller_interface::CallbackReturn NeuralController::on_init() {
 
     // Warn user that use_imu should be set in the robot description
     if (j.find("use_imu") != j.end()) {
-      RCLCPP_WARN(get_node()->get_logger(),
-                  "Policy JSON specifies use_imu=%d. Verify robot description has proper value of "
-                  "use_imu",
-                  j["use_imu"]);
       params_.use_imu = j["use_imu"];
+      RCLCPP_WARN(get_node()->get_logger(),
+                  "From JSON, setting params_use_imu=%d. Verify robot description has proper value "
+                  "of use_imu too.",
+                  params_.use_imu);
     }
 
     if (j.find("observation_history") != j.end()) {
-      RCLCPP_INFO(get_node()->get_logger(), "Setting observation_history from JSON");
       params_.observation_history = j["observation_history"];
+      RCLCPP_INFO(get_node()->get_logger(), "From JSON, setting params_.observation_history=%ld",
+                  params_.observation_history);
     }
 
     // Check that the observation history is consistent with the model input shape
     if (j["in_shape"].at(1) != params_.observation_history * kSingleObservationSize) {
       RCLCPP_ERROR(get_node()->get_logger(),
-                   "observation_history (%d) * kSingleObservationSize (%d) != in_shape (%d)",
+                   "observation_history (%ld) * kSingleObservationSize (%d) != in_shape (%d)",
                    params_.observation_history, kSingleObservationSize,
                    static_cast<int>(j["in_shape"].at(1)));
       return controller_interface::CallbackReturn::ERROR;
@@ -187,6 +187,22 @@ controller_interface::CallbackReturn NeuralController::on_activate(
   joy_subscriber_ = get_node()->create_subscription<Joy>(
       "/joy", rclcpp::SystemDefaultsQoS(),
       [this](const Joy::SharedPtr msg) { rt_joy_command_ptr_.writeFromNonRT(msg); });
+
+  // Initialize the publishers
+  policy_output_publisher_ =
+      get_node()->create_publisher<ActionMsg>("~/policy_output", rclcpp::SystemDefaultsQoS());
+  rt_policy_output_publisher_ =
+      std::make_shared<realtime_tools::RealtimePublisher<ActionMsg>>(policy_output_publisher_);
+
+  position_command_publisher_ =
+      get_node()->create_publisher<ActionMsg>("~/position_command", rclcpp::SystemDefaultsQoS());
+  rt_position_command_publisher_ =
+      std::make_shared<realtime_tools::RealtimePublisher<ActionMsg>>(position_command_publisher_);
+
+  observation_publisher_ =
+      get_node()->create_publisher<ObservationMsg>("~/observation", rclcpp::SystemDefaultsQoS());
+  rt_observation_publisher_ =
+      std::make_shared<realtime_tools::RealtimePublisher<ObservationMsg>>(observation_publisher_);
 
   RCLCPP_INFO(get_node()->get_logger(), "activate successful");
   return controller_interface::CallbackReturn::SUCCESS;
@@ -406,6 +422,14 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     return controller_interface::return_type::ERROR;
   }
 
+  // Publish the observation
+  if (rt_observation_publisher_->trylock()) {
+    // TODO make a custom msg type with header
+    // rt_observation_publisher_->msg_.header.stamp = time;
+    rt_observation_publisher_->msg_.data = observation_;
+    rt_observation_publisher_->unlockAndPublish();
+  }
+
   // Perform policy inference
   model_->forward(observation_.data());
 
@@ -416,6 +440,17 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
 
   // Process the actions
   const float *policy_output = model_->getOutputs();
+
+  // Publish the policy output
+  if (rt_policy_output_publisher_->trylock()) {
+    rt_policy_output_publisher_->msg_.data.resize(kActionSize, 0.0);
+    for (int i = 0; i < kActionSize; i++) {
+      rt_policy_output_publisher_->msg_.data.at(i) = policy_output[i];
+    }
+    // rt_policy_output_publisher_->msg_.header.stamp = time;
+    rt_policy_output_publisher_->unlockAndPublish();
+  }
+
   for (int i = 0; i < kActionSize; i++) {
     float action = policy_output[i];
     float action_scale = params_.action_scales.at(i);
@@ -451,6 +486,16 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
         .at("kd")
         .get()
         .set_value(params_.kds.at(i));
+  }
+
+  // Publish the scaled and final position command
+  if (rt_position_command_publisher_->trylock()) {
+    rt_position_command_publisher_->msg_.data.resize(kActionSize, 0.0);
+    for (int i = 0; i < kActionSize; i++) {
+      rt_position_command_publisher_->msg_.data.at(i) = action_.at(i);
+    }
+    // rt_position_command_publisher_->msg_.header.stamp = time;
+    rt_position_command_publisher_->unlockAndPublish();
   }
 
   // Get the policy inference time
