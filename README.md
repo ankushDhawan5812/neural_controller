@@ -9,10 +9,42 @@ Furthermore, common neural network libraries such as Torch are not designed to r
 `git clone git@github.com:G-Levine/neural_controller.git --recurse-submodules` \
 (Submodules must be recursively cloned)
 
+# Use
+
+## Simulate pupper with a RL policy
+### Requirements
+Clone these recursively to `ros2_ws/src/`
+* https://github.com/G-Levine/pupper_v3_description
+* https://github.com/Nate711/pupperv3_mujoco_sim
+
+Install requisite packages
+* `sudo apt install glfw`
+* `sudo rosdep init`
+* `rosdep update`
+
+Build
+* `cd ros2_ws`
+* `colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo`
+* We recommend aliasing the above command to `build`
+
+### Simulate
+* Connect PS4/PS5 gamepad to computer via bluetooth
+* `source install/local_setup.bash`
+* `ros2 launch neural_controller launch_sim.py`
+* Control the robot with the gamepad in the mujoco simulator!
+![Simulation Screenshot](sim_screenshot.png)
+
+
+### Use latest model from WandB
+* `python3 download_latest_policy.py`
+* Or specific run number: `python3 download_latest_policy.py --run_number=155`
+* Build again
+
+
 # Functionality
 ## Inputs
-- Maps hardware_interface states and ROS topics (such as cmd_vel) to the policy obersvation vector
-- Performs processing such as quaternion-to-gravity-vector conversion and scaling/normalization on the observations
+- Maps hardware_interface states and ROS topics (such as cmd_vel) to the policy observation vector
+- Performs processing such as quaternion-to-gravity-vector conversion
 - Allows for parts of the observation vector to be hardcoded as fixed values
 
 ## Outputs
