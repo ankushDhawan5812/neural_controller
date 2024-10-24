@@ -13,6 +13,7 @@ controller_manager:
 
 imu_sensor_broadcaster:
   ros__parameters:
+    update_rate: 100
     frame_id: base_link
     sensor_name: imu_sensor
 
@@ -21,6 +22,9 @@ neural_controller:
     repeat_action: 10
     observation_history: 2
     use_imu: true
+
+    estop_button_indices: [11, 12] # 11, 12 for PS4, 9, 10 for PS5
+    estop_release_button_idx: 9 # 9 for PS4, 7 for PS5
 
     joint_names:
       [

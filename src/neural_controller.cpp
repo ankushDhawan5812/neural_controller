@@ -267,6 +267,8 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     // Release estop if the release button is pressed
     if (joy_command->get()->buttons.at(params_.estop_release_button_idx) == 1) {
       estop_active_ = false;
+      on_activate(rclcpp_lifecycle::State());
+      return controller_interface::return_type::OK;
       RCLCPP_INFO(get_node()->get_logger(), "Emergency stop released");
     }
 

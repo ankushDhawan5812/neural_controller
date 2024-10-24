@@ -150,15 +150,15 @@ neural_controller:
   estop_button_indices:
     {
       type: int_array,
-      default_value: [9, 10],
-      description: "Index of the emergency stop button in joy message",
+      default_value: [11, 12],
+      description: "Index of the emergency stop button in joy message. [11, 12] for PS4 and [9, 10] for PS5",
     }
 
   estop_release_button_idx:
     {
       type: int,
-      default_value: 7,
-      description: "Index of the emergency stop release button in joy message",
+      default_value: 9,
+      description: "Index of the emergency stop release button in joy message. 9 for PS4 and 7 for PS5",
     }
 
   pitch_axis_idx:
