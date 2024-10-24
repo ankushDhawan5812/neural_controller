@@ -43,8 +43,8 @@ def generate_launch_description():
     )
 
     joy_node = Node(
-        package="joy",
-        executable="joy_node",
+        package="joy_linux",
+        executable="joy_linux_node",
         parameters=[robot_controllers],
         output="both",
     )
@@ -101,7 +101,7 @@ def generate_launch_description():
 
     nodes = [
         robot_state_publisher,
-        # imu_sensor_broadcaster_spawner,
+        imu_sensor_broadcaster_spawner,
         control_node,
         robot_controller_spawner,
         joint_state_broadcaster_spawner,

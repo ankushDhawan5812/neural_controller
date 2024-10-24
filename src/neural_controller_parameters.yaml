@@ -20,6 +20,13 @@ neural_controller:
       description: "Whether to use the IMU sensor",
     }
 
+  control_orientation:
+    {
+      type: bool,
+      default_value: true,
+      description: "Whether to control the orientation of the robot. This will add the orientation vector to the observation vector",
+    }
+
   imu_sensor_name:
     {
       type: string,

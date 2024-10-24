@@ -53,10 +53,17 @@ controller_interface::CallbackReturn NeuralController::on_init() {
     }
 
     std::ifstream json_stream(params_.model_path, std::ifstream::binary);
+    // if (!json_stream.is_open()) {
+    //   RCLCPP_ERROR(get_node()->get_logger(), "Failed to open model file: %s. Check that it
+    //   exists.",
+    //                params_.model_path.c_str());
+    //   return controller_interface::CallbackReturn::ERROR;
+    // }
     model_ = RTNeural::json_parser::parseJson<float>(json_stream, true);
 
     // Read params json file using nholsojson to extract metadata
     nlohmann::json j;
+
     std::ifstream json_file(params_.model_path);
     json_file >> j;
 
@@ -97,14 +104,32 @@ controller_interface::CallbackReturn NeuralController::on_init() {
       RCLCPP_WARN(get_node()->get_logger(),
                   "Policy JSON specifies use_imu=%d. Verify robot description has proper value of "
                   "use_imu",
-                  j["use_imu"]);
+                  static_cast<int>(j["use_imu"]));
       params_.use_imu = j["use_imu"];
+      RCLCPP_WARN(get_node()->get_logger(), "params_.use_imu=%d", params_.use_imu);
     }
 
     if (j.find("observation_history") != j.end()) {
       RCLCPP_INFO(get_node()->get_logger(), "Setting observation_history from JSON");
       params_.observation_history = j["observation_history"];
+      RCLCPP_INFO(get_node()->get_logger(), "params_.observation_history=%d",
+                  params_.observation_history);
     }
+
+    if (j.find("control_orientation") != j.end()) {
+      RCLCPP_INFO(get_node()->get_logger(), "Setting control_orientation from JSON: %d",
+                  static_cast<int>(j["control_orientation"]));
+      params_.control_orientation = j["control_orientation"];
+      RCLCPP_INFO(get_node()->get_logger(), "params_.control_orientation=%d",
+                  params_.control_orientation);
+    }
+
+    kJointPositionIdx = 9 + params_.control_orientation ? 3 : 0;
+    kLastActionIdx = kJointPositionIdx + kActionSize;
+    kSingleObservationSize = 3 + 3 + 3 + (params_.control_orientation ? 3 : 0) + kActionSize +
+                             kActionSize;  // base link angular velocity, projected gravity vector,
+                                           // x, y, yaw velocity commands, possibly desired world z
+                                           // in body frame, joint positions, previous action
 
     // Check that the observation history is consistent with the model input shape
     if (j["in_shape"].at(1) != params_.observation_history * kSingleObservationSize) {
@@ -288,10 +313,11 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
         tf2::quatRotate(tf2::Quaternion(tf2::Vector3(1, 0, 0), cmd_roll_deg * M_PI / 180.0),
                         desired_world_z_in_body_frame_);
 
-    RCLCPP_INFO(get_node()->get_logger(),
-                "cmd_pitch_deg: %f, cmd_roll_deg: %f desired_world_z_in_body_frame: %f %f %f",
-                cmd_pitch_deg, cmd_roll_deg, desired_world_z_in_body_frame_.getX(),
-                desired_world_z_in_body_frame_.getY(), desired_world_z_in_body_frame_.getZ());
+    // Print out the desired orientation of the body frame
+    // RCLCPP_INFO(get_node()->get_logger(),
+    //             "cmd_pitch_deg: %f, cmd_roll_deg: %f desired_world_z_in_body_frame: %f %f %f",
+    //             cmd_pitch_deg, cmd_roll_deg, desired_world_z_in_body_frame_.getX(),
+    //             desired_world_z_in_body_frame_.getY(), desired_world_z_in_body_frame_.getZ());
   }
 
   // If an emergency stop has been triggered, set all commands to 0 and return
@@ -346,6 +372,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
       }
     }
 
+    // Print angular velocity
     // RCLCPP_INFO(get_node()->get_logger(), "ang_vel: %f %f %f", ang_vel_x, ang_vel_y, ang_vel_z);
 
     // Calculate the projected gravity vector
@@ -374,10 +401,20 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     observation_.at(6) = (float)cmd_x_vel_;
     observation_.at(7) = (float)cmd_y_vel_;
     observation_.at(8) = (float)cmd_yaw_vel_;
-    // Orientation commands
-    observation_.at(9) = (float)desired_world_z_in_body_frame_.getX();
-    observation_.at(10) = (float)desired_world_z_in_body_frame_.getY();
-    observation_.at(11) = (float)desired_world_z_in_body_frame_.getZ();
+
+    // Desired orientation observation
+    if (params_.control_orientation) {
+      observation_.at(9) = (float)desired_world_z_in_body_frame_.getX();
+      observation_.at(10) = (float)desired_world_z_in_body_frame_.getY();
+      observation_.at(11) = (float)desired_world_z_in_body_frame_.getZ();
+    }
+
+    // Print out observation [0..11] on one line
+    std::string obs_str = "observation: ";
+    for (int i = 0; i < 12; i++) {
+      obs_str += std::to_string(observation_.at(i)) + " ";
+    }
+    RCLCPP_INFO(get_node()->get_logger(), "%s", obs_str.c_str());
 
     // Joint positions
     for (int i = 0; i < kActionSize; i++) {
@@ -416,6 +453,14 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
 
   // Process the actions
   const float *policy_output = model_->getOutputs();
+
+  // print all outputs
+  std::string policy_output_str = "policy_output: ";
+  for (int i = 0; i < kActionSize; i++) {
+    policy_output_str += std::to_string(policy_output[i]) + " ";
+  }
+  RCLCPP_INFO(get_node()->get_logger(), "%s", policy_output_str.c_str());
+
   for (int i = 0; i < kActionSize; i++) {
     float action = policy_output[i];
     float action_scale = params_.action_scales.at(i);

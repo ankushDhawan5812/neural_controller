@@ -66,15 +66,17 @@ class NeuralController : public controller_interface::ControllerInterface {
   /* ----------------- Layer sizes ----------------- */
   // TODO: Could make observation a struct with named fields
   static constexpr int kActionSize = 12;
-  static constexpr int kJointPositionIdx = 12;
-  static constexpr int kLastActionIdx = kJointPositionIdx + kActionSize;
-  static constexpr int kSingleObservationSize = 3              /* base link angular velocity */
-                                                + 3            /* projected gravity vector */
-                                                + 3            /* x, y, yaw velocity commands */
-                                                + 3            /* desired world z in body frame */
-                                                + kActionSize  /* joint positions */
-                                                + kActionSize; /* previous action */
-  static constexpr int kGravityZIndx = 5;  // Index of gravity z component in the observation
+  int kJointPositionIdx = 12;
+  int kLastActionIdx = kJointPositionIdx + kActionSize;
+  int kSingleObservationSize = 3              /* base link angular velocity */
+                               + 3            /* projected gravity vector */
+                               + 3            /* x, y, yaw velocity commands
+                                               */
+                               + 3            /* desired world z in body frame
+                                               */
+                               + kActionSize  /* joint positions */
+                               + kActionSize; /* previous action */
+  static constexpr int kGravityZIndx = 5;     // Index of gravity z component in the observation
   /* ----------------------------------------------- */
 
   std::shared_ptr<RTNeural::Model<float>> model_;

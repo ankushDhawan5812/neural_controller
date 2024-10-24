@@ -22,6 +22,7 @@ neural_controller:
     repeat_action: 10
     observation_history: 2
     use_imu: true
+    control_orientation: true
 
     estop_button_indices: [11, 12] # 11, 12 for PS4, 9, 10 for PS5
     estop_release_button_idx: 9 # 9 for PS4, 7 for PS5
@@ -106,7 +107,7 @@ neural_controller:
 
     max_body_angle: 1.5
 
-    model_path: "$(find-pkg-share neural_controller)/launch/policy_vocal-dawn-150_max_reward_22.22.json"
+    model_path: "$(find-pkg-share neural_controller)/launch/policy_latest.json"
 
 teleop_twist_joy_node:
   ros__parameters:
