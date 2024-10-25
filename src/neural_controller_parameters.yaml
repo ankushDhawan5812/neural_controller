@@ -2,7 +2,7 @@ neural_controller:
   repeat_action:
     {
       type: int,
-      default_value: 8,
+      default_value: 10,
       description: "Number of times to repeat the same action before querying the policy again",
     }
 
@@ -38,7 +38,7 @@ neural_controller:
     {
       type: double_array,
       default_value: [],
-      description: "Default joint positions to use when the controller is reset",
+      description: "Default joint positions. Added to policy output to get command. Subtracted from read motor angles to get observation, e.g. commanded_motor_angles = scaled_action + default_joint_pos",
     }
 
   kps:
@@ -159,6 +159,13 @@ neural_controller:
       type: int,
       default_value: 9,
       description: "Index of the emergency stop release button in joy message. 9 for PS4 and 7 for PS5",
+    }
+
+  estop_kd:
+    {
+      type: double,
+      default_value: 0.1,
+      description: "Velocity gain for the joints during emergency stop",
     }
 
   pitch_axis_idx:

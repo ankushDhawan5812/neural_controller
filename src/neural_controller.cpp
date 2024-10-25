@@ -46,10 +46,6 @@ controller_interface::CallbackReturn NeuralController::on_init() {
     param_listener_ = std::make_shared<ParamListener>(get_node());
     params_ = param_listener_->get_params();
 
-    if (!check_param_vector_size()) {
-      return controller_interface::CallbackReturn::ERROR;
-    }
-
     std::ifstream json_stream(params_.model_path, std::ifstream::binary);
     model_ = RTNeural::json_parser::parseJson<float>(json_stream, true);
 
@@ -68,26 +64,28 @@ controller_interface::CallbackReturn NeuralController::on_init() {
           RCLCPP_ERROR(get_node()->get_logger(), "%s", error_msg.c_str());
           throw std::runtime_error(error_msg);
         }
+        param.resize(j[key].size(), 0.0);
         for (int i = 0; i < param.size(); i++) {
           param.at(i) = j[key].at(i);
         }
       }
     };
 
-    auto set_param_from_json_scalar = [&](const std::string &key, auto &param) {
+    auto set_param_from_json_scalar = [&](const std::string &key, auto &param, int size) {
       if (j.find(key) != j.end()) {
         RCLCPP_INFO(get_node()->get_logger(), "From JSON, setting %s[:]=%f", key.c_str(),
                     static_cast<double>(j[key]));
+        param.resize(size, 0.0);
         for (auto &p : param) {
           p = j[key];
         }
       }
     };
 
-    set_param_from_json_scalar("action_scale", params_.action_scales);
-    set_param_from_json_scalar("kp", params_.kps);
-    set_param_from_json_scalar("kd", params_.kds);
-    set_param_from_json_vector("default_pose", params_.default_joint_pos);
+    set_param_from_json_scalar("action_scale", params_.action_scales, kActionSize);
+    set_param_from_json_scalar("kp", params_.kps, kActionSize);
+    set_param_from_json_scalar("kd", params_.kds, kActionSize);
+    set_param_from_json_vector("default_joint_pos", params_.default_joint_pos);
     set_param_from_json_vector("joint_lower_limits", params_.joint_lower_limits);
     set_param_from_json_vector("joint_upper_limits", params_.joint_upper_limits);
 
@@ -117,6 +115,10 @@ controller_interface::CallbackReturn NeuralController::on_init() {
 
   } catch (const std::exception &e) {
     fprintf(stderr, "Exception thrown during init stage with message: %s \n", e.what());
+    return controller_interface::CallbackReturn::ERROR;
+  }
+
+  if (!check_param_vector_size()) {
     return controller_interface::CallbackReturn::ERROR;
   }
 
@@ -314,6 +316,12 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
   if (estop_active_) {
     for (auto &command_interface : command_interfaces_) {
       command_interface.set_value(0.0);
+    }
+    for (int i = 0; i < kActionSize; i++) {
+      command_interfaces_map_.at(params_.joint_names.at(i))
+          .at("kd")
+          .get()
+          .set_value(params_.estop_kd);
     }
     return controller_interface::return_type::OK;
   }
