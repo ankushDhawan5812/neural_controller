@@ -40,6 +40,40 @@ bool NeuralController::check_param_vector_size() {
   }
   return true;
 }
+bool NeuralController::determine_estop_status(bool current_estop_active, const Joy &joy_msg,
+                                              const Params &params) {
+  try {
+    if (joy_msg.buttons.size() != kNumButtonsWired &&
+        joy_msg.buttons.size() != kNumButtonsWireless) {
+      RCLCPP_ERROR(get_node()->get_logger(),
+                   "Buttons vector size is not supported. Gamepad not recognized");
+      return current_estop_active;
+    }
+    const auto &estop_button_indices = (joy_msg.buttons.size() == kNumButtonsWired)
+                                           ? params.estop_button_indices_wired
+                                           : params.estop_button_indices_wireless;
+    const int estop_release_button_idx = (joy_msg.buttons.size() == kNumButtonsWired)
+                                             ? params.estop_release_button_idx_wired
+                                             : params.estop_release_button_idx_wireless;
+
+    for (auto idx : estop_button_indices) {
+      if (joy_msg.buttons.at(idx) == 1) {
+        return true;
+      }
+    }
+
+    if (joy_msg.buttons.at(estop_release_button_idx) == 1) {
+      return false;
+    }
+  } catch (const std::out_of_range &e) {
+    RCLCPP_ERROR(get_node()->get_logger(),
+                 "Button/axis index out of range. Please check that the "
+                 "estop_button_indices and estop_release_button_idx in the"
+                 "params YAML file are correct for your given gamepad");
+  }
+
+  return current_estop_active;
+}
 
 controller_interface::CallbackReturn NeuralController::on_init() {
   try {
@@ -274,42 +308,47 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
 
   auto joy_command = rt_joy_command_ptr_.readFromRT();
   if (joy_command && joy_command->get()) {
-    // Estop if any estop button pressed
-    // Use params_.estop_button_indices vector
-    for (auto idx : params_.estop_button_indices) {
-      if (joy_command->get()->buttons.at(idx) == 1) {
-        estop_active_ = true;
+    const Joy &joy_msg = *joy_command->get();
+
+    // Handle estop activate/deactivate
+    bool new_estop_active = determine_estop_status(estop_active_, joy_msg, params_);
+    if (estop_active_ != new_estop_active) {
+      if (new_estop_active) {
         RCLCPP_INFO(get_node()->get_logger(), "Emergency stop triggered");
+      } else {
+        on_activate(rclcpp_lifecycle::State());
+        RCLCPP_INFO(get_node()->get_logger(), "Emergency stop released");
       }
-    }
-    // Release estop if the release button is pressed
-    if (joy_command->get()->buttons.at(params_.estop_release_button_idx) == 1) {
-      estop_active_ = false;
-      on_activate(rclcpp_lifecycle::State());
+      estop_active_ = new_estop_active;
       return controller_interface::return_type::OK;
-      RCLCPP_INFO(get_node()->get_logger(), "Emergency stop released");
     }
 
-    // Set pitch command based on right stick y-axis
-    float cmd_pitch_deg =
-        joy_command->get()->axes.at(params_.pitch_axis_idx) * params_.max_pitch_deg;
+    try {
+      // Set pitch command based on right stick y-axis
+      float cmd_pitch_deg = joy_msg.axes.at(params_.pitch_axis_idx) * params_.max_pitch_deg;
 
-    // Set roll command based on right stick x-axis
-    float cmd_roll_deg = joy_command->get()->axes.at(params_.roll_axis_idx) * params_.max_roll_deg;
+      // Set roll command based on right stick x-axis
+      float cmd_roll_deg = joy_msg.axes.at(params_.roll_axis_idx) * params_.max_roll_deg;
 
-    // Set desired_world_z_in_body_frame_ based on pitch and roll commands
-    desired_world_z_in_body_frame_ = tf2::Vector3(0, 0, 1);
-    desired_world_z_in_body_frame_ =
-        tf2::quatRotate(tf2::Quaternion(tf2::Vector3(0, 1, 0), cmd_pitch_deg * M_PI / 180.0),
-                        desired_world_z_in_body_frame_);
-    desired_world_z_in_body_frame_ =
-        tf2::quatRotate(tf2::Quaternion(tf2::Vector3(1, 0, 0), cmd_roll_deg * M_PI / 180.0),
-                        desired_world_z_in_body_frame_);
+      // Set desired_world_z_in_body_frame_ based on pitch and roll commands
+      desired_world_z_in_body_frame_ = tf2::Vector3(0, 0, 1);
+      desired_world_z_in_body_frame_ =
+          tf2::quatRotate(tf2::Quaternion(tf2::Vector3(0, 1, 0), cmd_pitch_deg * M_PI / 180.0),
+                          desired_world_z_in_body_frame_);
+      desired_world_z_in_body_frame_ =
+          tf2::quatRotate(tf2::Quaternion(tf2::Vector3(1, 0, 0), cmd_roll_deg * M_PI / 180.0),
+                          desired_world_z_in_body_frame_);
 
-    RCLCPP_INFO(get_node()->get_logger(),
-                "cmd_pitch_deg: %f, cmd_roll_deg: %f desired_world_z_in_body_frame: %f %f %f",
-                cmd_pitch_deg, cmd_roll_deg, desired_world_z_in_body_frame_.getX(),
-                desired_world_z_in_body_frame_.getY(), desired_world_z_in_body_frame_.getZ());
+      // RCLCPP_INFO(get_node()->get_logger(),
+      //             "cmd_pitch_deg: %f, cmd_roll_deg: %f desired_world_z_in_body_frame: %f %f %f",
+      //             cmd_pitch_deg, cmd_roll_deg, desired_world_z_in_body_frame_.getX(),
+      //             desired_world_z_in_body_frame_.getY(), desired_world_z_in_body_frame_.getZ());
+    } catch (const std::out_of_range &e) {
+      RCLCPP_ERROR(get_node()->get_logger(),
+                   "Axis index out of range. Please check that the pitch/roll_axis_idx in "
+                   "params YAML file are correct for your given gamepad");
+      return controller_interface::return_type::ERROR;
+    }
   }
 
   // If an emergency stop has been triggered, set all commands to 0 and return
@@ -370,8 +409,6 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
       }
     }
 
-    // RCLCPP_INFO(get_node()->get_logger(), "ang_vel: %f %f %f", ang_vel_x, ang_vel_y, ang_vel_z);
-
     // Calculate the projected gravity vector
     tf2::Quaternion q(orientation_x, orientation_y, orientation_z, orientation_w);
     tf2::Matrix3x3 m(q);
@@ -414,7 +451,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
       }
     }
   } catch (const std::out_of_range &e) {
-    RCLCPP_INFO(get_node()->get_logger(), "failed to read joint states from hardware interface");
+    RCLCPP_INFO(get_node()->get_logger(), "Failed to read joint states from hardware interface");
     return controller_interface::return_type::OK;
   }
 
@@ -441,8 +478,8 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
   // Perform policy inference
   model_->forward(observation_.data());
 
-  // Shift the observation history to the right by kSingleObservationSize for the next control step
-  // https://en.cppreference.com/w/cpp/algorithm/rotate
+  // Shift the observation history to the right by kSingleObservationSize for the next control
+  // step https://en.cppreference.com/w/cpp/algorithm/rotate
   std::rotate(observation_.rbegin(), observation_.rbegin() + kSingleObservationSize,
               observation_.rend());
 

@@ -21,8 +21,6 @@ neural_controller:
     ros__parameters:
         repeat_action: 10
 
-        estop_button_indices: [9, 10] # 11, 12 for PS4, 9, 10 for PS5. Also depends on wired vs wireless controller
-        estop_release_button_idx: 7 # 9 for PS4, 7 for PS5. Also depends on wired vs wireless controller
         estop_kd: 0.1
 
         joint_names:

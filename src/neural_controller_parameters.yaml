@@ -147,18 +147,30 @@ neural_controller:
     }
 
   # TODO make a new joystick node
-  estop_button_indices:
+  estop_button_indices_wired:
     {
       type: int_array,
       default_value: [11, 12],
-      description: "Index of the emergency stop button in joy message. [11, 12] for PS4 and [9, 10] for PS5",
+      description: "Indices of the emergency stop buttons in joy message for wired controller",
+    }
+  estop_button_indices_wireless:
+    {
+      type: int_array,
+      default_value: [9, 10],
+      description: "Indices of the emergency stop buttons in joy message for wireless controller",
     }
 
-  estop_release_button_idx:
+  estop_release_button_idx_wired:
     {
       type: int,
       default_value: 9,
-      description: "Index of the emergency stop release button in joy message. 9 for PS4 and 7 for PS5",
+      description: "Index of the emergency stop release button in joy message for wired controller.",
+    }
+  estop_release_button_idx_wireless:
+    {
+      type: int,
+      default_value: 7,
+      description: "Index of the emergency stop release button in joy message for wireless controller.",
     }
 
   estop_kd:

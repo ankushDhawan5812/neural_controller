@@ -63,6 +63,11 @@ class NeuralController : public controller_interface::ControllerInterface {
  protected:
   bool check_param_vector_size();
 
+  // Determine if the emergency stop is active based on the joystick message
+  static constexpr int kNumButtonsWireless = 11;
+  static constexpr int kNumButtonsWired = 13;
+  bool determine_estop_status(bool current_estop_active, const Joy &joy_msg, const Params &params_);
+
   /* ----------------- Layer sizes ----------------- */
   // TODO: Could make observation a struct with named fields
   static constexpr int kActionSize = 12;
