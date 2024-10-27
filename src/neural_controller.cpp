@@ -351,7 +351,8 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     }
   }
 
-  // If an emergency stop has been triggered, set all commands to 0 and return
+  // If an emergency stop has been triggered, set all commands to 0, set damping, and return
+  // TODO: use deactivate instead?
   if (estop_active_) {
     for (auto &command_interface : command_interfaces_) {
       command_interface.set_value(0.0);
