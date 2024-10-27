@@ -80,6 +80,15 @@ controller_interface::CallbackReturn NeuralController::on_init() {
     param_listener_ = std::make_shared<ParamListener>(get_node());
     params_ = param_listener_->get_params();
 
+    if (params_.gain_multiplier < 0.0) {
+      RCLCPP_ERROR(get_node()->get_logger(), "Gain_multiplier must be >= 0.0. Stopping");
+      return controller_interface::CallbackReturn::ERROR;
+    }
+    if (params_.gain_multiplier != 1.0) {
+      RCLCPP_WARN(get_node()->get_logger(), "Gain_multiplier is set to %f",
+                  params_.gain_multiplier);
+    }
+
     std::ifstream json_stream(params_.model_path, std::ifstream::binary);
     model_ = RTNeural::json_parser::parseJson<float>(json_stream, true);
 
@@ -520,6 +529,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     }
 
     // Send the action to the hardware interface
+    // Multiply by the gain multiplier to scale the gains to account for real2sim gap
     command_interfaces_map_.at(params_.joint_names.at(i))
         .at(params_.action_types.at(i))
         .get()
@@ -527,11 +537,11 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     command_interfaces_map_.at(params_.joint_names.at(i))
         .at("kp")
         .get()
-        .set_value(params_.kps.at(i));
+        .set_value(params_.kps.at(i) * params_.gain_multiplier);
     command_interfaces_map_.at(params_.joint_names.at(i))
         .at("kd")
         .get()
-        .set_value(params_.kds.at(i));
+        .set_value(params_.kds.at(i) * params_.gain_multiplier);
   }
 
   // Publish the scaled and final position command

@@ -55,6 +55,13 @@ neural_controller:
       description: "Velocity gains for the joints",
     }
 
+  gain_multiplier:
+    {
+      type: double,
+      default_value: 1.0,
+      description: "Multiplier for the position control gains",
+    }
+
   init_kps:
     {
       type: double_array,
