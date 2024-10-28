@@ -49,7 +49,12 @@ def download_latest_model(
         print(f"Latest run: {run.name}")
 
     # get the artifact with the name that contains .json
-    art = [art for art in run.logged_artifacts() if ".json" in art.name][0]
+    artifacts = [art for art in run.logged_artifacts() if ".json" in art.name]
+    if not artifacts:
+        print("ERROR: No model .json files found in the run.")
+        return
+        
+    art = artifacts[0]
     print("Using artifact: ", art.name)
 
     # remove the :[version] from the name
