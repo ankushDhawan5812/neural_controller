@@ -334,7 +334,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
 
     try {
       // Set pitch command based on right stick y-axis
-      float cmd_pitch_deg = joy_msg.axes.at(params_.pitch_axis_idx) * params_.max_pitch_deg;
+      float cmd_pitch_deg = -joy_msg.axes.at(params_.pitch_axis_idx) * params_.max_pitch_deg;
 
       // Set roll command based on right stick x-axis
       float cmd_roll_deg = joy_msg.axes.at(params_.roll_axis_idx) * params_.max_roll_deg;

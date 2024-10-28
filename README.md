@@ -38,7 +38,7 @@ Build
 ### Use latest model from WandB
 * `pip install wandb`
 * `python3 download_latest_policy.py`
-   * Or specific run number: `python3 download_latest_policy.py --run_number=155`
+   * Or specific run number: `python3 download_latest_policy.py --run_number=167`
    * The script will ask you to provide your WandB API key
    * The script is hardcoded to use models from the `hands-on-robotics/pupperv3-mjx-rl` project so change if necessary.
 * This will download the policy .json file to launch folder as `policy_latest.json`
