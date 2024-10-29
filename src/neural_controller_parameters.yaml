@@ -2,7 +2,7 @@ neural_controller:
   repeat_action:
     {
       type: int,
-      default_value: 8,
+      default_value: 10,
       description: "Number of times to repeat the same action before querying the policy again",
     }
 
@@ -38,7 +38,7 @@ neural_controller:
     {
       type: double_array,
       default_value: [],
-      description: "Default joint positions to use when the controller is reset",
+      description: "Default joint positions. Added to policy output to get command. Subtracted from read motor angles to get observation, e.g. commanded_motor_angles = scaled_action + default_joint_pos",
     }
 
   kps:
@@ -53,6 +53,13 @@ neural_controller:
       type: double_array,
       default_value: [],
       description: "Velocity gains for the joints",
+    }
+
+  gain_multiplier:
+    {
+      type: double,
+      default_value: 1.0,
+      description: "Multiplier for the position control gains",
     }
 
   init_kps:
@@ -130,4 +137,65 @@ neural_controller:
       type: double,
       default_value: 0.52,
       description: "Maximum body angle (rad) allowed before the controller is reset",
+    }
+
+  max_pitch_deg:
+    {
+      type: double,
+      default_value: 30.0,
+      description: "Maximum pitch angle (deg) allowed before the controller is reset",
+    }
+
+  max_roll_deg:
+    {
+      type: double,
+      default_value: 30.0,
+      description: "Maximum roll angle (deg) allowed before the controller is reset",
+    }
+
+  # TODO make a new joystick node
+  estop_button_indices_wired:
+    {
+      type: int_array,
+      default_value: [11, 12],
+      description: "Indices of the emergency stop buttons in joy message for wired controller",
+    }
+  estop_button_indices_wireless:
+    {
+      type: int_array,
+      default_value: [9, 10],
+      description: "Indices of the emergency stop buttons in joy message for wireless controller",
+    }
+
+  estop_release_button_idx_wired:
+    {
+      type: int,
+      default_value: 9,
+      description: "Index of the emergency stop release button in joy message for wired controller.",
+    }
+  estop_release_button_idx_wireless:
+    {
+      type: int,
+      default_value: 7,
+      description: "Index of the emergency stop release button in joy message for wireless controller.",
+    }
+
+  estop_kd:
+    {
+      type: double,
+      default_value: 0.1,
+      description: "Velocity gain for the joints during emergency stop",
+    }
+
+  pitch_axis_idx:
+    {
+      type: int,
+      default_value: 4,
+      description: "Index of the pitch axis in joy message",
+    }
+  roll_axis_idx:
+    {
+      type: int,
+      default_value: 6,
+      description: "Index of the roll axis in joy message",
     }

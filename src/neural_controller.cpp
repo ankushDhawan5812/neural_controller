@@ -15,7 +15,7 @@ namespace neural_controller {
 NeuralController::NeuralController()
     : controller_interface::ControllerInterface(),
       rt_command_ptr_(nullptr),
-      cmd_subscriber_(nullptr) {}
+      rt_joy_command_ptr_(nullptr) {}
 
 // Check parameter vectors have the correct size
 bool NeuralController::check_param_vector_size() {
@@ -33,12 +33,46 @@ bool NeuralController::check_param_vector_size() {
 
   for (const auto &[name, size] : param_sizes) {
     if (size != kActionSize) {
-      RCLCPP_ERROR(get_node()->get_logger(), "%s size is %d, expected %d", name.c_str(), size,
+      RCLCPP_ERROR(get_node()->get_logger(), "%s size is %ld, expected %d", name.c_str(), size,
                    kActionSize);
       return false;
     }
   }
   return true;
+}
+bool NeuralController::determine_estop_status(bool current_estop_active, const Joy &joy_msg,
+                                              const Params &params) {
+  try {
+    if (joy_msg.buttons.size() != kNumButtonsWired &&
+        joy_msg.buttons.size() != kNumButtonsWireless) {
+      RCLCPP_ERROR(get_node()->get_logger(),
+                   "Buttons vector size is not supported. Gamepad not recognized");
+      return current_estop_active;
+    }
+    const auto &estop_button_indices = (joy_msg.buttons.size() == kNumButtonsWired)
+                                           ? params.estop_button_indices_wired
+                                           : params.estop_button_indices_wireless;
+    const int estop_release_button_idx = (joy_msg.buttons.size() == kNumButtonsWired)
+                                             ? params.estop_release_button_idx_wired
+                                             : params.estop_release_button_idx_wireless;
+
+    for (auto idx : estop_button_indices) {
+      if (joy_msg.buttons.at(idx) == 1) {
+        return true;
+      }
+    }
+
+    if (joy_msg.buttons.at(estop_release_button_idx) == 1) {
+      return false;
+    }
+  } catch (const std::out_of_range &e) {
+    RCLCPP_ERROR(get_node()->get_logger(),
+                 "Button/axis index out of range. Please check that the "
+                 "estop_button_indices and estop_release_button_idx in the"
+                 "params YAML file are correct for your given gamepad");
+  }
+
+  return current_estop_active;
 }
 
 controller_interface::CallbackReturn NeuralController::on_init() {
@@ -46,8 +80,13 @@ controller_interface::CallbackReturn NeuralController::on_init() {
     param_listener_ = std::make_shared<ParamListener>(get_node());
     params_ = param_listener_->get_params();
 
-    if (!check_param_vector_size()) {
+    if (params_.gain_multiplier < 0.0) {
+      RCLCPP_ERROR(get_node()->get_logger(), "Gain_multiplier must be >= 0.0. Stopping");
       return controller_interface::CallbackReturn::ERROR;
+    }
+    if (params_.gain_multiplier != 1.0) {
+      RCLCPP_WARN(get_node()->get_logger(), "Gain_multiplier is set to %f",
+                  params_.gain_multiplier);
     }
 
     std::ifstream json_stream(params_.model_path, std::ifstream::binary);
@@ -60,54 +99,58 @@ controller_interface::CallbackReturn NeuralController::on_init() {
 
     auto set_param_from_json_vector = [&](const std::string &key, auto &param) {
       if (j.find(key) != j.end()) {
-        RCLCPP_INFO(get_node()->get_logger(), "Setting %s from JSON", key.c_str());
+        RCLCPP_INFO(get_node()->get_logger(), "From JSON, setting %s vector element-by-element",
+                    key.c_str());
         if (j[key].size() != kActionSize) {
           std::string error_msg = "Invalid size for " + key + " (" + std::to_string(j[key].size()) +
                                   ") != " + std::to_string(kActionSize);
           RCLCPP_ERROR(get_node()->get_logger(), "%s", error_msg.c_str());
           throw std::runtime_error(error_msg);
         }
+        param.resize(j[key].size(), 0.0);
         for (int i = 0; i < param.size(); i++) {
           param.at(i) = j[key].at(i);
         }
       }
     };
 
-    auto set_param_from_json_scalar = [&](const std::string &key, auto &param) {
+    auto set_param_from_json_scalar = [&](const std::string &key, auto &param, int size) {
       if (j.find(key) != j.end()) {
-        RCLCPP_INFO(get_node()->get_logger(), "Setting %s=%f from JSON", key.c_str(),
+        RCLCPP_INFO(get_node()->get_logger(), "From JSON, setting %s[:]=%f", key.c_str(),
                     static_cast<double>(j[key]));
+        param.resize(size, 0.0);
         for (auto &p : param) {
           p = j[key];
         }
       }
     };
 
-    set_param_from_json_scalar("action_scale", params_.action_scales);
-    set_param_from_json_scalar("kp", params_.kps);
-    set_param_from_json_scalar("kd", params_.kds);
-    set_param_from_json_vector("default_pose", params_.default_joint_pos);
+    set_param_from_json_scalar("action_scale", params_.action_scales, kActionSize);
+    set_param_from_json_scalar("kp", params_.kps, kActionSize);
+    set_param_from_json_scalar("kd", params_.kds, kActionSize);
+    set_param_from_json_vector("default_joint_pos", params_.default_joint_pos);
     set_param_from_json_vector("joint_lower_limits", params_.joint_lower_limits);
     set_param_from_json_vector("joint_upper_limits", params_.joint_upper_limits);
 
     // Warn user that use_imu should be set in the robot description
     if (j.find("use_imu") != j.end()) {
-      RCLCPP_WARN(get_node()->get_logger(),
-                  "Policy JSON specifies use_imu=%d. Verify robot description has proper value of "
-                  "use_imu",
-                  j["use_imu"]);
       params_.use_imu = j["use_imu"];
+      RCLCPP_WARN(get_node()->get_logger(),
+                  "From JSON, setting params_use_imu=%d. Verify robot description has proper value "
+                  "of use_imu too.",
+                  params_.use_imu);
     }
 
     if (j.find("observation_history") != j.end()) {
-      RCLCPP_INFO(get_node()->get_logger(), "Setting observation_history from JSON");
       params_.observation_history = j["observation_history"];
+      RCLCPP_INFO(get_node()->get_logger(), "From JSON, setting params_.observation_history=%ld",
+                  params_.observation_history);
     }
 
     // Check that the observation history is consistent with the model input shape
     if (j["in_shape"].at(1) != params_.observation_history * kSingleObservationSize) {
       RCLCPP_ERROR(get_node()->get_logger(),
-                   "observation_history (%d) * kSingleObservationSize (%d) != in_shape (%d)",
+                   "observation_history (%ld) * kSingleObservationSize (%d) != in_shape (%d)",
                    params_.observation_history, kSingleObservationSize,
                    static_cast<int>(j["in_shape"].at(1)));
       return controller_interface::CallbackReturn::ERROR;
@@ -115,6 +158,10 @@ controller_interface::CallbackReturn NeuralController::on_init() {
 
   } catch (const std::exception &e) {
     fprintf(stderr, "Exception thrown during init stage with message: %s \n", e.what());
+    return controller_interface::CallbackReturn::ERROR;
+  }
+
+  if (!check_param_vector_size()) {
     return controller_interface::CallbackReturn::ERROR;
   }
 
@@ -142,6 +189,7 @@ controller_interface::InterfaceConfiguration NeuralController::state_interface_c
 controller_interface::CallbackReturn NeuralController::on_activate(
     const rclcpp_lifecycle::State & /*previous_state*/) {
   rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
+  rt_joy_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<Joy>>(nullptr);
 
   // Populate the command interfaces map
   for (auto &command_interface : command_interfaces_) {
@@ -181,6 +229,26 @@ controller_interface::CallbackReturn NeuralController::on_activate(
       "/cmd_vel", rclcpp::SystemDefaultsQoS(),
       [this](const CmdType::SharedPtr msg) { rt_command_ptr_.writeFromNonRT(msg); });
 
+  joy_subscriber_ = get_node()->create_subscription<Joy>(
+      "/joy", rclcpp::SystemDefaultsQoS(),
+      [this](const Joy::SharedPtr msg) { rt_joy_command_ptr_.writeFromNonRT(msg); });
+
+  // Initialize the publishers
+  policy_output_publisher_ =
+      get_node()->create_publisher<ActionMsg>("~/policy_output", rclcpp::SystemDefaultsQoS());
+  rt_policy_output_publisher_ =
+      std::make_shared<realtime_tools::RealtimePublisher<ActionMsg>>(policy_output_publisher_);
+
+  position_command_publisher_ =
+      get_node()->create_publisher<ActionMsg>("~/position_command", rclcpp::SystemDefaultsQoS());
+  rt_position_command_publisher_ =
+      std::make_shared<realtime_tools::RealtimePublisher<ActionMsg>>(position_command_publisher_);
+
+  observation_publisher_ =
+      get_node()->create_publisher<ObservationMsg>("~/observation", rclcpp::SystemDefaultsQoS());
+  rt_observation_publisher_ =
+      std::make_shared<realtime_tools::RealtimePublisher<ObservationMsg>>(observation_publisher_);
+
   RCLCPP_INFO(get_node()->get_logger(), "activate successful");
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -193,6 +261,7 @@ controller_interface::CallbackReturn NeuralController::on_error(
 controller_interface::CallbackReturn NeuralController::on_deactivate(
     const rclcpp_lifecycle::State & /*previous_state*/) {
   rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
+  rt_joy_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<Joy>>(nullptr);
   for (auto &command_interface : command_interfaces_) {
     command_interface.set_value(0.0);
   }
@@ -231,14 +300,6 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
   double time_since_fade_in = (time - init_time_).seconds() - params_.init_duration;
   float fade_in_multiplier = std::min(time_since_fade_in / params_.fade_in_duration, 1.0);
 
-  // If an emergency stop has been triggered, set all commands to 0 and return
-  if (estop_active_) {
-    for (auto &command_interface : command_interfaces_) {
-      command_interface.set_value(0.0);
-    }
-    return controller_interface::return_type::OK;
-  }
-
   // Only get a new action from the policy when repeat_action_counter_ is 0
   repeat_action_counter_ += 1;
   repeat_action_counter_ %= params_.repeat_action;
@@ -252,6 +313,66 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     cmd_x_vel_ = command->get()->linear.x;
     cmd_y_vel_ = command->get()->linear.y;
     cmd_yaw_vel_ = command->get()->angular.z;
+  }
+
+  auto joy_command = rt_joy_command_ptr_.readFromRT();
+  if (joy_command && joy_command->get()) {
+    const Joy &joy_msg = *joy_command->get();
+
+    // Handle estop activate/deactivate
+    bool new_estop_active = determine_estop_status(estop_active_, joy_msg, params_);
+    if (estop_active_ != new_estop_active) {
+      if (new_estop_active) {
+        RCLCPP_INFO(get_node()->get_logger(), "Emergency stop triggered");
+      } else {
+        on_activate(rclcpp_lifecycle::State());
+        RCLCPP_INFO(get_node()->get_logger(), "Emergency stop released");
+      }
+      estop_active_ = new_estop_active;
+      return controller_interface::return_type::OK;
+    }
+
+    try {
+      // Set pitch command based on right stick y-axis
+      float cmd_pitch_deg = -joy_msg.axes.at(params_.pitch_axis_idx) * params_.max_pitch_deg;
+
+      // Set roll command based on right stick x-axis
+      float cmd_roll_deg = joy_msg.axes.at(params_.roll_axis_idx) * params_.max_roll_deg;
+
+      // Set desired_world_z_in_body_frame_ based on pitch and roll commands
+      desired_world_z_in_body_frame_ = tf2::Vector3(0, 0, 1);
+      desired_world_z_in_body_frame_ =
+          tf2::quatRotate(tf2::Quaternion(tf2::Vector3(0, 1, 0), cmd_pitch_deg * M_PI / 180.0),
+                          desired_world_z_in_body_frame_);
+      desired_world_z_in_body_frame_ =
+          tf2::quatRotate(tf2::Quaternion(tf2::Vector3(1, 0, 0), cmd_roll_deg * M_PI / 180.0),
+                          desired_world_z_in_body_frame_);
+
+      // RCLCPP_INFO(get_node()->get_logger(),
+      //             "cmd_pitch_deg: %f, cmd_roll_deg: %f desired_world_z_in_body_frame: %f %f %f",
+      //             cmd_pitch_deg, cmd_roll_deg, desired_world_z_in_body_frame_.getX(),
+      //             desired_world_z_in_body_frame_.getY(), desired_world_z_in_body_frame_.getZ());
+    } catch (const std::out_of_range &e) {
+      RCLCPP_ERROR(get_node()->get_logger(),
+                   "Axis index out of range. Please check that the pitch/roll_axis_idx in "
+                   "params YAML file are correct for your given gamepad");
+      return controller_interface::return_type::ERROR;
+    }
+  }
+
+  // If an emergency stop has been triggered, set all commands to 0, set damping, and return
+  // TODO: use deactivate instead?
+  if (estop_active_) {
+    for (auto &command_interface : command_interfaces_) {
+      command_interface.set_value(0.0);
+    }
+    for (int i = 0; i < kActionSize; i++) {
+      command_interfaces_map_.at(params_.joint_names.at(i))
+          .at("kd")
+          .get()
+          .set_value(params_.estop_kd);
+    }
+    return controller_interface::return_type::OK;
   }
 
   // Get the latest observation
@@ -298,8 +419,6 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
       }
     }
 
-    // RCLCPP_INFO(get_node()->get_logger(), "ang_vel: %f %f %f", ang_vel_x, ang_vel_y, ang_vel_z);
-
     // Calculate the projected gravity vector
     tf2::Quaternion q(orientation_x, orientation_y, orientation_z, orientation_w);
     tf2::Matrix3x3 m(q);
@@ -322,10 +441,15 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     observation_.at(3) = (float)projected_gravity_vector[0];
     observation_.at(4) = (float)projected_gravity_vector[1];
     observation_.at(5) = (float)projected_gravity_vector[2];
-    // Commands
+    // Velocity commands
     observation_.at(6) = (float)cmd_x_vel_;
     observation_.at(7) = (float)cmd_y_vel_;
     observation_.at(8) = (float)cmd_yaw_vel_;
+    // Orientation commands
+    observation_.at(9) = (float)desired_world_z_in_body_frame_.getX();
+    observation_.at(10) = (float)desired_world_z_in_body_frame_.getY();
+    observation_.at(11) = (float)desired_world_z_in_body_frame_.getZ();
+
     // Joint positions
     for (int i = 0; i < kActionSize; i++) {
       // Only include the joint position in the observation if the action type
@@ -337,7 +461,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
       }
     }
   } catch (const std::out_of_range &e) {
-    RCLCPP_INFO(get_node()->get_logger(), "failed to read joint states from hardware interface");
+    RCLCPP_INFO(get_node()->get_logger(), "Failed to read joint states from hardware interface");
     return controller_interface::return_type::OK;
   }
 
@@ -353,16 +477,35 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     return controller_interface::return_type::ERROR;
   }
 
+  // Publish the observation
+  if (rt_observation_publisher_->trylock()) {
+    // TODO make a custom msg type with header
+    // rt_observation_publisher_->msg_.header.stamp = time;
+    rt_observation_publisher_->msg_.data = observation_;
+    rt_observation_publisher_->unlockAndPublish();
+  }
+
   // Perform policy inference
   model_->forward(observation_.data());
 
-  // Shift the observation history to the right by kSingleObservationSize for the next control step
-  // https://en.cppreference.com/w/cpp/algorithm/rotate
+  // Shift the observation history to the right by kSingleObservationSize for the next control
+  // step https://en.cppreference.com/w/cpp/algorithm/rotate
   std::rotate(observation_.rbegin(), observation_.rbegin() + kSingleObservationSize,
               observation_.rend());
 
   // Process the actions
   const float *policy_output = model_->getOutputs();
+
+  // Publish the policy output
+  if (rt_policy_output_publisher_->trylock()) {
+    rt_policy_output_publisher_->msg_.data.resize(kActionSize, 0.0);
+    for (int i = 0; i < kActionSize; i++) {
+      rt_policy_output_publisher_->msg_.data.at(i) = policy_output[i];
+    }
+    // rt_policy_output_publisher_->msg_.header.stamp = time;
+    rt_policy_output_publisher_->unlockAndPublish();
+  }
+
   for (int i = 0; i < kActionSize; i++) {
     float action = policy_output[i];
     float action_scale = params_.action_scales.at(i);
@@ -386,6 +529,7 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     }
 
     // Send the action to the hardware interface
+    // Multiply by the gain multiplier to scale the gains to account for real2sim gap
     command_interfaces_map_.at(params_.joint_names.at(i))
         .at(params_.action_types.at(i))
         .get()
@@ -393,11 +537,21 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     command_interfaces_map_.at(params_.joint_names.at(i))
         .at("kp")
         .get()
-        .set_value(params_.kps.at(i));
+        .set_value(params_.kps.at(i) * params_.gain_multiplier);
     command_interfaces_map_.at(params_.joint_names.at(i))
         .at("kd")
         .get()
-        .set_value(params_.kds.at(i));
+        .set_value(params_.kds.at(i) * params_.gain_multiplier);
+  }
+
+  // Publish the scaled and final position command
+  if (rt_position_command_publisher_->trylock()) {
+    rt_position_command_publisher_->msg_.data.resize(kActionSize, 0.0);
+    for (int i = 0; i < kActionSize; i++) {
+      rt_position_command_publisher_->msg_.data.at(i) = action_.at(i);
+    }
+    // rt_position_command_publisher_->msg_.header.stamp = time;
+    rt_position_command_publisher_->unlockAndPublish();
   }
 
   // Get the policy inference time

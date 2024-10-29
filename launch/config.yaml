@@ -13,14 +13,16 @@ controller_manager:
 
 imu_sensor_broadcaster:
   ros__parameters:
+    update_rate: 100
     frame_id: base_link
     sensor_name: imu_sensor
 
 neural_controller:
   ros__parameters:
     repeat_action: 10
-    observation_history: 2
-    use_imu: true
+
+    gain_multiplier: 1.0
+    estop_kd: 0.1
 
     joint_names:
       [
@@ -40,9 +42,6 @@ neural_controller:
 
     default_joint_pos:
       [0.26, 0.0, -0.52, -0.26, 0.0, 0.52, 0.26, 0.0, -0.52, -0.26, 0.0, 0.52]
-    kps: [7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5]
-    kds:
-      [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
 
     init_kps: [7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5]
     init_kds:
@@ -66,43 +65,10 @@ neural_controller:
         "position",
         "position",
       ]
-    action_scales: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
-
-    joint_upper_limits:
-      [
-        2.509999990463257,
-        3.140000104904175,
-        0.7099999785423279,
-        1.2200000286102295,
-        0.41999998688697815,
-        2.7899999618530273,
-        2.509999990463257,
-        3.140000104904175,
-        0.7099999785423279,
-        1.2200000286102295,
-        0.41999998688697815,
-        2.7899999618530273,
-      ]
-
-    joint_lower_limits:
-      [
-        -1.2200000286102295,
-        -0.41999998688697815,
-        -2.7899999618530273,
-        -2.509999990463257,
-        -3.140000104904175,
-        -0.7099999785423279,
-        -1.2200000286102295,
-        -0.41999998688697815,
-        -2.7899999618530273,
-        -2.509999990463257,
-        -3.140000104904175,
-        -0.7099999785423279,
-      ]
 
     max_body_angle: 1.5
 
-    model_path: "$(find-pkg-share neural_controller)/launch/policy.json"
+    model_path: "$(find-pkg-share neural_controller)/launch/policy_latest.json"
 
 teleop_twist_joy_node:
   ros__parameters:
