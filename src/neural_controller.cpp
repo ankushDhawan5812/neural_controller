@@ -5,11 +5,15 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <thread>    // for std::this_thread::sleep_for
+#include <chrono>    // for std::chrono::seconds
 
 #include "controller_interface/helpers.hpp"
 #include "hardware_interface/loaned_command_interface.hpp"
 #include "rclcpp/logging.hpp"
 #include "rclcpp/qos.hpp"
+#include "std_msgs/msg/string.hpp"
+
 
 namespace neural_controller {
 NeuralController::NeuralController()
@@ -210,6 +214,8 @@ controller_interface::CallbackReturn NeuralController::on_activate(
   }
 
   init_time_ = get_node()->now();
+  gpt_timer = get_node()->now();
+  during_gpt_response_ = "";
   repeat_action_counter_ = -1;
 
   cmd_x_vel_ = 0.0;
@@ -232,6 +238,23 @@ controller_interface::CallbackReturn NeuralController::on_activate(
   joy_subscriber_ = get_node()->create_subscription<Joy>(
       "/joy", rclcpp::SystemDefaultsQoS(),
       [this](const Joy::SharedPtr msg) { rt_joy_command_ptr_.writeFromNonRT(msg); });
+
+  // gpt_response_subscriber_ = get_node()->create_subscription<std_msgs::msg::String>(
+  //     "/gpt4_response_topic", rclcpp::SystemDefaultsQoS(),
+  //     [this](const std_msgs::msg::String::SharedPtr msg) {
+  //         RCLCPP_INFO(get_node()->get_logger(), "Received GPT message: %s", msg->data.c_str());
+  //     });  // Closing lambda and function call properly
+
+  gpt_response_subscriber_ = get_node()->create_subscription<std_msgs::msg::String>(
+    "/gpt4_response_topic", rclcpp::SystemDefaultsQoS(),
+    [this](const std_msgs::msg::String::SharedPtr msg) {
+        last_gpt_response_ = msg;  // Store the latest message
+        RCLCPP_INFO(get_node()->get_logger(), "Received GPT message: %s", msg->data.c_str());
+    });
+  
+  // Initialize the GPT response publisher
+  gpt_response_publisher_ = get_node()->create_publisher<std_msgs::msg::String>(
+    "/gpt4_response_topic", rclcpp::SystemDefaultsQoS());
 
   // Initialize the publishers
   policy_output_publisher_ =
@@ -314,6 +337,135 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     cmd_y_vel_ = command->get()->linear.y;
     cmd_yaw_vel_ = command->get()->angular.z;
   }
+
+  // std::string gpt_response;
+  // auto gpt_msg = gpt_response_subscriber_->get_last_message();
+  // if (gpt_msg) {
+  //   gpt_response = gpt_msg->data;
+  // } else {
+  //   gpt_response = "";
+  // }
+
+  std::string gpt_response = last_gpt_response_ ? last_gpt_response_->data : "";
+  if (during_gpt_response_ != "") {
+    gpt_response = during_gpt_response_;
+  }
+
+  // Run if GPT response is not empty
+  if (gpt_response != "") {
+    RCLCPP_INFO(get_node()->get_logger(), "Received GPT message: %s", gpt_response.c_str());
+    if (gpt_response == "stop" || gpt_response == "Stop" || gpt_response == "STOP") {
+      RCLCPP_INFO(get_node()->get_logger(), "Received stop command from GPT");
+      cmd_x_vel_ = 0.0;
+      cmd_y_vel_ = 0.0;
+      cmd_yaw_vel_ = 0.0;
+      // gpt_response = "";
+
+      // START TIMER
+      if (during_gpt_response_ == "") {
+        gpt_timer = get_node()->now();
+        during_gpt_response_ = gpt_response;
+      }
+      double dgpt;
+      dgpt = gpt_timer.seconds();
+      if (get_node()->now().seconds() - dgpt > 1) {
+        std_msgs::msg::String empty_msg;
+        empty_msg.data = "";
+        gpt_response_publisher_->publish(empty_msg);
+        during_gpt_response_ = "";
+      }
+
+      std_msgs::msg::String empty_msg;
+      empty_msg.data = "";
+      gpt_response_publisher_->publish(empty_msg);
+    }
+
+    if (gpt_response == "turn right" || gpt_response == "Turn right" ||
+        gpt_response == "Turn Right") {
+      RCLCPP_INFO(get_node()->get_logger(), "Received right command from GPT");
+      cmd_x_vel_ = 0.0;
+      cmd_y_vel_ = 0.0;
+      cmd_yaw_vel_ = -1.5;
+      // gpt_response = "";
+
+      if (during_gpt_response_ == "") {
+        // float temp_timer = get_node()->now().seconds();
+        gpt_timer = get_node()->now();
+        during_gpt_response_ = gpt_response;
+      }
+      // double dgpt = gpt_timer;
+      RCLCPP_INFO(get_node()->get_logger(), "Time since GPT timer started: %f seconds", (get_node()->now().seconds() - gpt_timer.seconds()));
+      RCLCPP_INFO(get_node()->get_logger(), "During GPT response: %s", during_gpt_response_.c_str());
+      RCLCPP_INFO(get_node()->get_logger(), "GPT timer: %f", gpt_timer.seconds());
+      double dgpt;
+      dgpt = gpt_timer.seconds();
+      if (get_node()->now().seconds() - dgpt > 1) {
+        std_msgs::msg::String empty_msg;
+        empty_msg.data = "";
+        gpt_response_publisher_->publish(empty_msg);
+        during_gpt_response_ = "";
+      }
+
+      std_msgs::msg::String empty_msg;
+      empty_msg.data = "";
+      gpt_response_publisher_->publish(empty_msg);
+    }
+
+    if (gpt_response == "turn left" || gpt_response == "Turn left" ||
+        gpt_response == "Turn Left") {
+      RCLCPP_INFO(get_node()->get_logger(), "Received left command from GPT");
+      cmd_x_vel_ = 0.0;
+      cmd_y_vel_ = 0.0;
+      cmd_yaw_vel_ = 1.5;
+      // gpt_response = "";
+
+      if (during_gpt_response_ == "") {
+        gpt_timer = get_node()->now();
+        during_gpt_response_ = gpt_response;
+      }
+      double dgpt;
+      dgpt = gpt_timer.seconds();
+      if (get_node()->now().seconds() - dgpt > 1) {
+        std_msgs::msg::String empty_msg;
+        empty_msg.data = "";
+        gpt_response_publisher_->publish(empty_msg);
+        during_gpt_response_ = "";
+      }
+
+      std_msgs::msg::String empty_msg;
+      empty_msg.data = "";
+      gpt_response_publisher_->publish(empty_msg);
+    }
+
+
+    if (gpt_response == "move" || gpt_response == "Move" || gpt_response == "MOVE") { 
+      RCLCPP_INFO(get_node()->get_logger(), "Received move command from GPT");
+      cmd_x_vel_ = 1.0;
+      cmd_y_vel_ = 0.0;
+      cmd_yaw_vel_ = 0.0;
+      // gpt_response = "";
+
+      if (during_gpt_response_ == "") {
+        gpt_timer = get_node()->now();
+        during_gpt_response_ = gpt_response;
+      }
+     double dgpt;
+     dgpt = gpt_timer.seconds();
+      if (get_node()->now().seconds() - dgpt > 1) {
+        std_msgs::msg::String empty_msg;
+        empty_msg.data = "";
+        gpt_response_publisher_->publish(empty_msg);
+        during_gpt_response_ = "";
+      }
+      
+      std_msgs::msg::String empty_msg;
+      empty_msg.data = "";
+      gpt_response_publisher_->publish(empty_msg);
+    }
+  }
+
+  RCLCPP_INFO(get_node()->get_logger(), "Commanded x velocity: %f, yaw velocity: %f", cmd_x_vel_, cmd_yaw_vel_);
+
 
   auto joy_command = rt_joy_command_ptr_.readFromRT();
   if (joy_command && joy_command->get()) {

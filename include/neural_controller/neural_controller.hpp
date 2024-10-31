@@ -10,6 +10,8 @@
 
 #include "controller_interface/controller_interface.hpp"
 #include "geometry_msgs/msg/twist.hpp"
+#include "std_msgs/msg/string.hpp"
+
 #include "rclcpp/subscription.hpp"
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/state.hpp"
@@ -122,6 +124,14 @@ class NeuralController : public controller_interface::ControllerInterface {
   realtime_tools::RealtimeBuffer<std::shared_ptr<Joy>> rt_joy_command_ptr_;
   rclcpp::Subscription<Joy>::SharedPtr joy_subscriber_ = nullptr;
 
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr gpt_response_publisher_;
+
+    std_msgs::msg::String::SharedPtr last_gpt_response_;
+
+
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr gpt_response_subscriber_;
+
+
   // Alias message types for future improvements
   using ActionMsg = std_msgs::msg::Float32MultiArray;
   using ObservationMsg = std_msgs::msg::Float32MultiArray;
@@ -140,6 +150,8 @@ class NeuralController : public controller_interface::ControllerInterface {
   rclcpp::Publisher<ObservationMsg>::SharedPtr observation_publisher_ = nullptr;
 
   rclcpp::Time init_time_;
+  std::string during_gpt_response_ = "";
+  rclcpp::Time gpt_timer;
 
   int repeat_action_counter_;
 
